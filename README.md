@@ -43,6 +43,19 @@ The API uses JWT (JSON Web Tokens) for authentication:
    Authorization: Bearer <your-token>
    ```
 
+### Seeded Super Admin (for local/demo use)
+
+- Run the initializer to create tables and seed a super admin:
+  ```bash
+  source .venv/bin/activate
+  python init_db.py
+  ```
+- Default credentials (override via `CARESPHERE_ADMIN_EMAIL` / `CARESPHERE_ADMIN_PASSWORD` before running the script):
+  - Email: `admin@caresphere.com`
+  - Password: `admin123`
+- Please sign in once and change the password immediately before exposing any environment to others.
+- The script **does not** touch remote DB URLs—only what you configure in `.env`.
+
 ## ⚙️ Sender Settings
 
 The API supports flexible sender configurations at multiple scopes:
