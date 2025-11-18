@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer
 
 from app.models.user import UserRole, UserStatus
 
@@ -21,12 +21,20 @@ class UserBase(BaseModel):
     status: UserStatus
     emailVerified: bool = Field(alias="email_verified")
     lastLoginAt: Optional[datetime] = Field(default=None, alias="last_login_at")
+    
+    @field_serializer('lastLoginAt')
+    def serialize_last_login(self, value: Optional[datetime]) -> Optional[str]:
+        return value.isoformat() if value else None
 
 
 class UserPublic(UserBase):
     id: str
     createdAt: datetime = Field(alias="created_at")
     updatedAt: datetime = Field(alias="updated_at")
+    
+    @field_serializer('createdAt', 'updatedAt')
+    def serialize_datetime(self, value: datetime) -> str:
+        return value.isoformat()
 
 
 class UserCreate(BaseModel):
