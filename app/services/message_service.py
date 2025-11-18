@@ -25,6 +25,7 @@ from app.schemas.message import (
     MessageSenderProfileUpdate,
     MessageUpdate,
 )
+from app.services import settings_service
 from app.utils.exceptions import NotFoundError, ValidationError
 
 
@@ -71,6 +72,8 @@ def create_message(db: Session, payload: MessageCreate, *, current_user: User) -
         name_override=payload.senderName,
         email_override=payload.senderEmail,
         phone_override=payload.senderPhone,
+        db=db,
+        current_user=current_user,
     )
 
     message = Message(
@@ -134,6 +137,8 @@ def update_message(db: Session, message_id: str, payload: MessageUpdate) -> Mess
             payload.senderName,
             payload.senderEmail,
             payload.senderPhone,
+            db=db,
+            current_user=None,  # Update messages don't have current_user context
         )
         message.sender_name = sender_name
         message.sender_email = sender_email
@@ -302,14 +307,32 @@ def _resolve_sender_details(
     name_override: Optional[str],
     email_override: Optional[str],
     phone_override: Optional[str],
+    *,
+    db: Session = None,
+    current_user: User = None,
 ) -> Tuple[str, str, str]:
-    sender_name = name_override or (sender_profile.label if sender_profile else settings.MSG_SENDER_NAME)
-    sender_email = email_override or (
-        sender_profile.sender_email if sender_profile and sender_profile.sender_email else settings.MSG_SENDER_EMAIL
-    )
-    sender_phone = phone_override or (
-        sender_profile.sender_phone if sender_profile and sender_profile.sender_phone else settings.MSG_SENDER_PHONE
-    )
+    # Use overrides first
+    if name_override and email_override and phone_override:
+        return name_override, email_override, phone_override
+    
+    # Try sender profile next
+    profile_name = sender_profile.label if sender_profile else None
+    profile_email = sender_profile.sender_email if sender_profile and sender_profile.sender_email else None
+    profile_phone = sender_profile.sender_phone if sender_profile and sender_profile.sender_phone else None
+    
+    # Get resolved settings as fallback
+    fallback_name, fallback_email, fallback_phone = settings.MSG_SENDER_NAME, settings.MSG_SENDER_EMAIL, settings.MSG_SENDER_PHONE
+    if db and current_user:
+        try:
+            fallback_name, fallback_email, fallback_phone, _ = settings_service.get_resolved_sender_settings(db, current_user)
+        except Exception:
+            # Fall back to env settings if there's any issue
+            pass
+    
+    sender_name = name_override or profile_name or fallback_name
+    sender_email = email_override or profile_email or fallback_email
+    sender_phone = phone_override or profile_phone or fallback_phone
+    
     return sender_name, sender_email, sender_phone
 
 

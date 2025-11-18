@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, String
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, String
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
@@ -36,6 +37,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE)
     email_verified = Column(Boolean, nullable=False, default=False)
     last_login_at = Column(DateTime(timezone=True))
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)
+
+    organization = relationship("Organization", back_populates="users")
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<User id={self.id} email={self.email}>"

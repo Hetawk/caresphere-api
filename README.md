@@ -43,6 +43,46 @@ The API uses JWT (JSON Web Tokens) for authentication:
    Authorization: Bearer <your-token>
    ```
 
+## ⚙️ Sender Settings
+
+The API supports flexible sender configurations at multiple scopes:
+
+### Scope Hierarchy
+
+1. **User-level**: Personal sender overrides for individual users
+2. **Organization-level**: Shared sender settings for organization members
+3. **Global-level**: System-wide defaults (admin only)
+4. **Environment-level**: Fallback from environment variables
+
+Settings cascade from specific to general: user → organization → global → environment.
+
+### API Endpoints
+
+- `GET /settings/senders/resolved` - Get effective sender settings for current user
+- `GET /settings/senders` - List sender settings (with scope filters)
+- `PUT /settings/senders` - Create/update sender settings
+- `DELETE /settings/senders` - Delete specific sender settings
+
+### Permission Model
+
+- **Super Admin**: Can manage global settings
+- **Admin**: Can manage organization settings
+- **User**: Can manage personal settings only
+
+### Example Usage
+
+```bash
+# Get resolved settings (cascaded)
+curl -H "Authorization: Bearer <token>" \
+  https://caresphere.ekddigital.com/settings/senders/resolved
+
+# Set personal sender override
+curl -X PUT -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@company.com","phone":"+1234567890"}' \
+  https://caresphere.ekddigital.com/settings/senders?scope=USER
+```
+
 ## 🚢 Deployment
 
 ### Production URL
