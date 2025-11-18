@@ -1,0 +1,14 @@
+"""Central API router that wires all domain modules."""
+
+from fastapi import APIRouter
+
+from app.api import auth, members, messages, templates, automation, analytics
+
+api_router = APIRouter()
+
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(members.router, prefix="/members", tags=["Members"])
+api_router.include_router(messages.router, prefix="/messages", tags=["Messages"])
+api_router.include_router(templates.router, prefix="/templates", tags=["Templates"])
+api_router.include_router(automation.router, prefix="/automation", tags=["Automation"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
