@@ -77,3 +77,27 @@ class RefreshResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Schema for changing password when user is logged in."""
+    currentPassword: str = Field(min_length=1)
+    newPassword: str = Field(min_length=8)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema for initiating password reset flow."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for completing password reset with token."""
+    email: EmailStr
+    token: str = Field(min_length=6, max_length=6)
+    newPassword: str = Field(min_length=8)
+
+
+class VerifyEmailRequest(BaseModel):
+    """Schema for email verification."""
+    email: EmailStr
+    token: str = Field(min_length=6, max_length=6)
