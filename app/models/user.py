@@ -34,18 +34,20 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     display_name = Column(String(100))
     avatar_url = Column(String(500))
     role = Column(Enum(UserRole), nullable=False, default=UserRole.MEMBER)
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE)
+    status = Column(Enum(UserStatus), nullable=False,
+                    default=UserStatus.ACTIVE)
     email_verified = Column(Boolean, nullable=False, default=False)
     last_login_at = Column(DateTime(timezone=True))
-    
+
     # Password reset fields
     reset_token_hash = Column(String(255), nullable=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
-    
+
     # Email verification fields
     verification_token_hash = Column(String(255), nullable=True)
-    
-    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)
+
+    organization_id = Column(String(36), ForeignKey(
+        "organizations.id"), nullable=True)
 
     organization = relationship("Organization", back_populates="users")
 

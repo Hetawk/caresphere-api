@@ -111,7 +111,7 @@ async def forgot_password(
     """Initiate password reset flow. Sends reset token via email (or returns it for dev)."""
     try:
         user, token = auth_service.initiate_password_reset(db, payload.email)
-        
+
         # TODO: In production, send token via email service
         # For now, return token in response for development
         response = MessageResponse(
@@ -138,7 +138,8 @@ async def reset_password(
         payload.token,
         payload.newPassword
     )
-    response = MessageResponse(message="Password reset successfully. You can now log in with your new password")
+    response = MessageResponse(
+        message="Password reset successfully. You can now log in with your new password")
     return responses.success_response(response.model_dump())
 
 

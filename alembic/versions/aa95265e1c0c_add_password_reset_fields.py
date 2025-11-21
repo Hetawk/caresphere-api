@@ -20,9 +20,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add password reset fields
-    op.add_column('users', sa.Column('reset_token_hash', sa.String(255), nullable=True))
-    op.add_column('users', sa.Column('reset_token_expires', sa.DateTime(timezone=True), nullable=True))
-    op.add_column('users', sa.Column('verification_token_hash', sa.String(255), nullable=True))
+    op.add_column('users', sa.Column(
+        'reset_token_hash', sa.String(255), nullable=True))
+    op.add_column('users', sa.Column('reset_token_expires',
+                  sa.DateTime(timezone=True), nullable=True))
+    op.add_column('users', sa.Column(
+        'verification_token_hash', sa.String(255), nullable=True))
 
 
 def downgrade() -> None:

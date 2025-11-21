@@ -25,18 +25,30 @@ class MemberBase(BaseModel):
     zipCode: Optional[str] = Field(default=None, alias="zip_code")
     country: Optional[str] = None
     memberStatus: MemberStatus = Field(alias="member_status")
-    membershipType: Optional[str] = Field(default=None, alias="membership_type")
+    membershipType: Optional[str] = Field(
+        default=None, alias="membership_type")
     joinDate: Optional[date] = Field(default=None, alias="join_date")
     photoUrl: Optional[str] = Field(default=None, alias="photo_url")
     notes: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     customFields: dict = Field(default_factory=dict, alias="custom_fields")
 
+    # Additional CSV fields
+    workSchool: Optional[str] = Field(default=None, alias="work_school")
+    whatsappNumber: Optional[str] = Field(
+        default=None, alias="whatsapp_number")
+    wechatId: Optional[str] = Field(default=None, alias="wechat_id")
+    hearAboutUs: Optional[str] = Field(default=None, alias="hear_about_us")
+    involvement: Optional[str] = None
+    comments: Optional[str] = None
+    consentGiven: Optional[bool] = Field(default=False, alias="consent_given")
+
 
 class MemberCreate(MemberBase):
     firstName: str = Field(alias="first_name")
     lastName: str = Field(alias="last_name")
-    memberStatus: MemberStatus = Field(default=MemberStatus.ACTIVE, alias="member_status")
+    memberStatus: MemberStatus = Field(
+        default=MemberStatus.ACTIVE, alias="member_status")
 
 
 class MemberUpdate(BaseModel):
@@ -53,13 +65,25 @@ class MemberUpdate(BaseModel):
     state: Optional[str] = None
     zipCode: Optional[str] = Field(default=None, alias="zip_code")
     country: Optional[str] = None
-    memberStatus: Optional[MemberStatus] = Field(default=None, alias="member_status")
-    membershipType: Optional[str] = Field(default=None, alias="membership_type")
+    memberStatus: Optional[MemberStatus] = Field(
+        default=None, alias="member_status")
+    membershipType: Optional[str] = Field(
+        default=None, alias="membership_type")
     joinDate: Optional[date] = Field(default=None, alias="join_date")
     photoUrl: Optional[str] = Field(default=None, alias="photo_url")
     notes: Optional[str] = None
     tags: Optional[List[str]] = None
     customFields: Optional[dict] = Field(default=None, alias="custom_fields")
+
+    # Additional CSV fields
+    workSchool: Optional[str] = Field(default=None, alias="work_school")
+    whatsappNumber: Optional[str] = Field(
+        default=None, alias="whatsapp_number")
+    wechatId: Optional[str] = Field(default=None, alias="wechat_id")
+    hearAboutUs: Optional[str] = Field(default=None, alias="hear_about_us")
+    involvement: Optional[str] = None
+    comments: Optional[str] = None
+    consentGiven: Optional[bool] = Field(default=None, alias="consent_given")
 
 
 class MemberPublic(MemberBase):
@@ -105,6 +129,7 @@ class MemberActivityPublic(BaseModel):
     id: str
     activityType: str = Field(alias="activity_type")
     description: Optional[str] = None
-    metadata: dict = Field(default_factory=dict, validation_alias="activity_metadata")
+    metadata: dict = Field(default_factory=dict,
+                           validation_alias="activity_metadata")
     createdAt: datetime = Field(alias="created_at")
     createdBy: Optional[str] = Field(default=None, alias="created_by")

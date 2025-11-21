@@ -68,11 +68,12 @@ def change_password(db: Session, user: User, current_password: str, new_password
     # Verify current password
     if not security.verify_password(current_password, user.password_hash):
         raise AuthenticationError("Current password is incorrect")
-    
+
     # Validate new password is different
     if current_password == new_password:
-        raise ValidationError({"newPassword": "New password must be different from current password"})
-    
+        raise ValidationError(
+            {"newPassword": "New password must be different from current password"})
+
     # Update password
     user.password_hash = security.get_password_hash(new_password)
     user.updated_at = datetime.utcnow()
@@ -92,25 +93,26 @@ def initiate_password_reset(db: Session, email: str) -> Tuple[User, str]:
     """
     user = db.query(User).filter(User.email == email.lower()).first()
     if not user:
-        raise ValidationError({"email": "No user found with this email address"})
-    
+        raise ValidationError(
+            {"email": "No user found with this email address"})
+
     # Generate reset token
     token = generate_reset_token()
     token_hash = security.hash_password(token)  # Hash the token for storage
-    
+
     # Store token and expiry (you'll need to add these fields to User model)
     user.reset_token_hash = token_hash
     user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
     user.updated_at = datetime.utcnow()
     db.commit()
-    
+
     return user, token
 
 
 def reset_password_with_token(
-    db: Session, 
-    email: str, 
-    token: str, 
+    db: Session,
+    email: str,
+    token: str,
     new_password: str
 ) -> User:
     """
@@ -120,18 +122,20 @@ def reset_password_with_token(
     user = db.query(User).filter(User.email == email.lower()).first()
     if not user:
         raise ValidationError({"email": "Invalid email or token"})
-    
+
     # Check if token exists and hasn't expired
     if not user.reset_token_hash or not user.reset_token_expires:
-        raise ValidationError({"token": "No password reset requested for this account"})
-    
+        raise ValidationError(
+            {"token": "No password reset requested for this account"})
+
     if datetime.utcnow() > user.reset_token_expires:
-        raise ValidationError({"token": "Password reset token has expired. Please request a new one"})
-    
+        raise ValidationError(
+            {"token": "Password reset token has expired. Please request a new one"})
+
     # Verify token
     if not security.verify_password(token, user.reset_token_hash):
         raise ValidationError({"token": "Invalid or expired token"})
-    
+
     # Update password and clear reset token
     user.password_hash = security.get_password_hash(new_password)
     user.reset_token_hash = None
@@ -139,7 +143,7 @@ def reset_password_with_token(
     user.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(user)
-    
+
     return user
 
 
@@ -151,23 +155,24 @@ def verify_email_with_token(db: Session, email: str, token: str) -> User:
     user = db.query(User).filter(User.email == email.lower()).first()
     if not user:
         raise ValidationError({"email": "Invalid email or token"})
-    
+
     if user.email_verified:
         raise ValidationError({"email": "Email is already verified"})
-    
+
     # Check verification token (assumes similar fields as reset token)
     if not hasattr(user, 'verification_token_hash') or not user.verification_token_hash:
-        raise ValidationError({"token": "No verification token found for this account"})
-    
+        raise ValidationError(
+            {"token": "No verification token found for this account"})
+
     # Verify token
     if not security.verify_password(token, user.verification_token_hash):
         raise ValidationError({"token": "Invalid verification token"})
-    
+
     # Mark email as verified
     user.email_verified = True
     user.verification_token_hash = None
     user.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(user)
-    
+
     return user

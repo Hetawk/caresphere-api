@@ -40,7 +40,8 @@ class Member(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     state = Column(String(100))
     zip_code = Column(String(20))
     country = Column(String(100))
-    member_status = Column(Enum(MemberStatus), nullable=False, default=MemberStatus.ACTIVE)
+    member_status = Column(
+        Enum(MemberStatus), nullable=False, default=MemberStatus.ACTIVE)
     membership_type = Column(String(50))
     join_date = Column(Date)
     photo_url = Column(String(500))
@@ -49,13 +50,24 @@ class Member(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     custom_fields = Column(JSON, default=dict)
     created_by = Column(String(36), ForeignKey("users.id"))
 
-    creator = relationship("User", foreign_keys=[created_by], lazy="joined", viewonly=True)
+    # Additional fields from CSV import
+    work_school = Column(String(200))  # Work or School information
+    whatsapp_number = Column(String(20))  # WhatsApp contact
+    wechat_id = Column(String(100))  # WeChat ID
+    hear_about_us = Column(Text)  # How they heard about the organization
+    involvement = Column(Text)  # Ministries/groups they want to join
+    comments = Column(Text)  # Additional comments
+    consent_given = Column(Boolean, default=False)  # Data consent
+
+    creator = relationship("User", foreign_keys=[
+                           created_by], lazy="joined", viewonly=True)
 
 
 class MemberNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "member_notes"
 
-    member_id = Column(String(36), ForeignKey("members.id"), nullable=False, index=True)
+    member_id = Column(String(36), ForeignKey(
+        "members.id"), nullable=False, index=True)
     note = Column(Text, nullable=False)
     note_type = Column(String(50))
     is_private = Column(Boolean, nullable=False, default=False)
@@ -68,7 +80,8 @@ class MemberNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class MemberActivity(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "member_activities"
 
-    member_id = Column(String(36), ForeignKey("members.id"), nullable=False, index=True)
+    member_id = Column(String(36), ForeignKey(
+        "members.id"), nullable=False, index=True)
     activity_type = Column(String(50), nullable=False)
     description = Column(Text)
     activity_metadata = Column("metadata", JSON, default=dict)
