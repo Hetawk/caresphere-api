@@ -22,8 +22,8 @@ router = APIRouter()
 ADMIN_ROLES = (UserRole.SUPER_ADMIN, UserRole.ADMIN)
 
 
-@router.post("/configurations", status_code=status.HTTP_201_CREATED)
-async def create_field_configuration(
+@router.post("/configs", status_code=status.HTTP_201_CREATED)
+async def create_field_config(
     payload: FieldConfigurationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.require_roles(*ADMIN_ROLES)),
@@ -37,26 +37,26 @@ async def create_field_configuration(
     return responses.success_response(body, status_code=status.HTTP_201_CREATED)
 
 
-@router.get("/configurations")
-async def list_field_configurations(
+@router.get("/configs")
+async def list_field_configs(
     entity_type: EntityType | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
     """List all field configurations for the organization."""
-    configurations = field_config_service.list_field_configurations(
+    configs = field_config_service.list_field_configurations(
         db, current_user.organization_id, entity_type
     )
     data = [
         FieldConfigurationPublic.model_validate(
             config).model_dump(by_alias=True)
-        for config in configurations
+        for config in configs
     ]
-    return responses.success_response({"configurations": data})
+    return responses.success_response({"configs": data})
 
 
-@router.get("/configurations/{config_id}")
-async def get_field_configuration(
+@router.get("/configs/{config_id}")
+async def get_field_config(
     config_id: str,
     db: Session = Depends(get_db),
     _: User = Depends(deps.get_current_user),
@@ -68,8 +68,8 @@ async def get_field_configuration(
     return responses.success_response(body)
 
 
-@router.put("/configurations/{config_id}")
-async def update_field_configuration(
+@router.put("/configs/{config_id}")
+async def update_field_config(
     config_id: str,
     payload: FieldConfigurationUpdate,
     db: Session = Depends(get_db),
@@ -83,8 +83,8 @@ async def update_field_configuration(
     return responses.success_response(body)
 
 
-@router.delete("/configurations/{config_id}")
-async def delete_field_configuration(
+@router.delete("/configs/{config_id}")
+async def delete_field_config(
     config_id: str,
     db: Session = Depends(get_db),
     _: User = Depends(deps.require_roles(*ADMIN_ROLES)),
@@ -106,14 +106,14 @@ async def get_entity_fields(
         db, current_user.organization_id, entity_type, entity_id
     )
 
-    configurations = [
+    configs = [
         FieldConfigurationPublic.model_validate(
             config).model_dump(by_alias=True)
         for config in data["configurations"]
     ]
 
     response_data = EntityFieldsResponse(
-        configurations=configurations,
+        configs=configs,
         values=data["values"]
     )
 
@@ -130,14 +130,14 @@ async def save_entity_fields(
     data = field_config_service.save_entity_fields(
         db, current_user.organization_id, payload)
 
-    configurations = [
+    configs = [
         FieldConfigurationPublic.model_validate(
             config).model_dump(by_alias=True)
         for config in data["configurations"]
     ]
 
     response_data = EntityFieldsResponse(
-        configurations=configurations,
+        configs=configs,
         values=data["values"]
     )
 

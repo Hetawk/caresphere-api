@@ -97,7 +97,7 @@ class EntityFieldsResponse(BaseModel):
     """Response containing all field configurations and values for an entity."""
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    configurations: List[FieldConfigurationPublic]
+    configs: List[FieldConfigurationPublic]
     values: dict[str, Any] = Field(default_factory=dict)  # field_key -> value
 
 
