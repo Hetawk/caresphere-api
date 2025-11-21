@@ -33,7 +33,7 @@ async def create_field_config(
         db, current_user.organization_id, payload, current_user
     )
     body = FieldConfigurationPublic.model_validate(
-        field_config).model_dump(by_alias=True)
+        field_config).model_dump(by_alias=True, mode='json')
     return responses.success_response(body, status_code=status.HTTP_201_CREATED)
 
 
@@ -49,7 +49,7 @@ async def list_field_configs(
     )
     data = [
         FieldConfigurationPublic.model_validate(
-            config).model_dump(by_alias=True)
+            config).model_dump(by_alias=True, mode='json')
         for config in configs
     ]
     return responses.success_response({"configs": data})
@@ -64,7 +64,7 @@ async def get_field_config(
     """Get a specific field configuration."""
     config = field_config_service.get_field_configuration(db, config_id)
     body = FieldConfigurationPublic.model_validate(
-        config).model_dump(by_alias=True)
+        config).model_dump(by_alias=True, mode='json')
     return responses.success_response(body)
 
 
@@ -79,7 +79,7 @@ async def update_field_config(
     config = field_config_service.update_field_configuration(
         db, config_id, payload)
     body = FieldConfigurationPublic.model_validate(
-        config).model_dump(by_alias=True)
+        config).model_dump(by_alias=True, mode='json')
     return responses.success_response(body)
 
 
@@ -108,7 +108,7 @@ async def get_entity_fields(
 
     configs = [
         FieldConfigurationPublic.model_validate(
-            config).model_dump(by_alias=True)
+            config).model_dump(by_alias=True, mode='json')
         for config in data["configurations"]
     ]
 
@@ -132,7 +132,7 @@ async def save_entity_fields(
 
     configs = [
         FieldConfigurationPublic.model_validate(
-            config).model_dump(by_alias=True)
+            config).model_dump(by_alias=True, mode='json')
         for config in data["configurations"]
     ]
 
