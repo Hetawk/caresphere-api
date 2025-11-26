@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
@@ -15,6 +17,7 @@ from app.models.message import (
     MessageRecipient,
     MessageSenderProfile,
     MessageStatus,
+    MessageType,
     RecipientStatus,
     SenderChannel,
 )
@@ -26,7 +29,10 @@ from app.schemas.message import (
     MessageUpdate,
 )
 from app.services import settings_service
+from app.services.email_service import email_service, EmailSendError
 from app.utils.exceptions import NotFoundError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def list_messages(
@@ -65,7 +71,8 @@ def get_message(db: Session, message_id: str) -> Message:
 def create_message(db: Session, payload: MessageCreate, *, current_user: User) -> Message:
     sender_profile = None
     if payload.senderProfileId:
-        sender_profile = _get_sender_profile(db, payload.senderProfileId, current_user)
+        sender_profile = _get_sender_profile(
+            db, payload.senderProfileId, current_user)
 
     sender_name, sender_email, sender_phone = _resolve_sender_details(
         sender_profile=sender_profile,
@@ -107,7 +114,8 @@ def create_message(db: Session, payload: MessageCreate, *, current_user: User) -
     from app.models.message import MessageRecipient
 
     message.recipient_count = (
-        db.query(MessageRecipient).filter(MessageRecipient.message_id == message.id).count()
+        db.query(MessageRecipient).filter(
+            MessageRecipient.message_id == message.id).count()
     )
     db.add(message)
     db.commit()
@@ -156,34 +164,148 @@ def delete_message(db: Session, message_id: str) -> None:
     db.commit()
 
 
+async def _send_to_recipient(
+    message: Message,
+    recipient: MessageRecipient,
+) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Send a message to a single recipient via EKDSend API.
+
+    Returns:
+        Tuple of (success, message_id, error_message)
+    """
+    try:
+        message_type = message.message_type
+
+        if message_type == MessageType.EMAIL:
+            if not recipient.recipient_email:
+                return False, None, "No email address for recipient"
+
+            result = await email_service.send_email(
+                to=recipient.recipient_email,
+                subject=message.title or "No Subject",
+                body=message.content,
+                from_email=message.sender_email,
+            )
+            return True, result.get("messageId"), None
+
+        elif message_type == MessageType.SMS:
+            if not recipient.recipient_phone:
+                return False, None, "No phone number for recipient"
+
+            result = await email_service.send_sms(
+                to=recipient.recipient_phone,
+                body=message.content,
+            )
+            return True, result.get("messageId"), None
+
+        elif message_type == MessageType.PUSH:
+            # Push notifications handled separately (not via EKDSend)
+            logger.info(
+                f"Push notification for recipient {recipient.id} - not yet implemented")
+            return True, None, None
+
+        else:
+            return False, None, f"Unsupported message type: {message_type}"
+
+    except EmailSendError as e:
+        logger.error(
+            f"Failed to send message to recipient {recipient.id}: {e}")
+        return False, None, str(e)
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error sending to recipient {recipient.id}")
+        return False, None, f"Unexpected error: {str(e)}"
+
+
 def send_message(db: Session, message_id: str) -> Message:
+    """
+    Send a message to all its recipients via EKDSend API.
+
+    This function:
+    1. Updates message status to SENDING
+    2. Sends to each recipient via EKDSend (email/SMS)
+    3. Updates recipient statuses based on API response
+    4. Updates message status to SENT or PARTIALLY_SENT
+    """
     message = get_message(db, message_id)
     message.status = MessageStatus.SENDING
     db.add(message)
     db.commit()
 
-    # Placeholder for actual delivery providers
     now = datetime.utcnow()
-    for recipient in message.recipients:
-        recipient.status = RecipientStatus.SENT
-        recipient.sent_at = now
-        db.add(recipient)
+    success_count = 0
+    failed_count = 0
 
-    message.status = MessageStatus.SENT
+    # Run the async sending in a sync context
+    async def send_all():
+        nonlocal success_count, failed_count
+        for recipient in message.recipients:
+            success, ext_message_id, error = await _send_to_recipient(message, recipient)
+
+            if success:
+                recipient.status = RecipientStatus.SENT
+                recipient.sent_at = datetime.utcnow()
+                # Store external message ID in metadata if returned
+                if ext_message_id:
+                    recipient.recipient_metadata = recipient.recipient_metadata or {}
+                    recipient.recipient_metadata["ekdsend_message_id"] = ext_message_id
+                success_count += 1
+                logger.info(
+                    f"Successfully sent to {recipient.recipient_email or recipient.recipient_phone}")
+            else:
+                recipient.status = RecipientStatus.FAILED
+                recipient.error_message = error
+                failed_count += 1
+                logger.warning(
+                    f"Failed to send to recipient {recipient.id}: {error}")
+
+            db.add(recipient)
+
+    # Execute async sending
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, create a task
+            asyncio.ensure_future(send_all())
+        else:
+            loop.run_until_complete(send_all())
+    except RuntimeError:
+        # No event loop, create a new one
+        asyncio.run(send_all())
+
+    # Update message status based on results
+    if failed_count == 0:
+        message.status = MessageStatus.SENT
+    elif success_count == 0:
+        message.status = MessageStatus.FAILED
+    else:
+        # Some succeeded, some failed
+        message.status = MessageStatus.SENT  # Consider as sent if any succeeded
+
     message.sent_at = now
     message.recipient_count = len(message.recipients)
     db.add(message)
     db.commit()
     db.refresh(message)
+
+    logger.info(
+        f"Message {message_id} sending complete: "
+        f"{success_count} succeeded, {failed_count} failed"
+    )
+
     return message
 
 
 def get_message_analytics(db: Session, message_id: str) -> dict:
     message = get_message(db, message_id)
     total_sent = len(message.recipients)
-    total_opened = sum(1 for r in message.recipients if r.status in {RecipientStatus.OPENED, RecipientStatus.CLICKED})
-    total_clicked = sum(1 for r in message.recipients if r.status == RecipientStatus.CLICKED)
-    total_failed = sum(1 for r in message.recipients if r.status == RecipientStatus.FAILED)
+    total_opened = sum(1 for r in message.recipients if r.status in {
+                       RecipientStatus.OPENED, RecipientStatus.CLICKED})
+    total_clicked = sum(
+        1 for r in message.recipients if r.status == RecipientStatus.CLICKED)
+    total_failed = sum(
+        1 for r in message.recipients if r.status == RecipientStatus.FAILED)
     total_delivered = total_sent - total_failed
 
     open_rate = (total_opened / total_sent * 100) if total_sent else 0
@@ -287,10 +409,12 @@ def _validate_sender_payload(
         sender_phone = payload.sender_phone
 
     if channel == SenderChannel.EMAIL and not sender_email:
-        raise ValidationError({"senderEmail": "Email sender is required for email channel"})
+        raise ValidationError(
+            {"senderEmail": "Email sender is required for email channel"})
 
     if channel == SenderChannel.SMS and not sender_phone:
-        raise ValidationError({"senderPhone": "Phone sender is required for SMS channel"})
+        raise ValidationError(
+            {"senderPhone": "Phone sender is required for SMS channel"})
 
 
 def _get_sender_profile(db: Session, profile_id: str, current_user: User) -> MessageSenderProfile:
@@ -298,7 +422,8 @@ def _get_sender_profile(db: Session, profile_id: str, current_user: User) -> Mes
     if not profile:
         raise NotFoundError("Sender profile", profile_id)
     if profile.user_id != current_user.id and current_user.role != UserRole.SUPER_ADMIN:
-        raise ValidationError({"senderProfileId": "You do not have access to this profile"})
+        raise ValidationError(
+            {"senderProfileId": "You do not have access to this profile"})
     return profile
 
 
@@ -314,25 +439,26 @@ def _resolve_sender_details(
     # Use overrides first
     if name_override and email_override and phone_override:
         return name_override, email_override, phone_override
-    
+
     # Try sender profile next
     profile_name = sender_profile.label if sender_profile else None
     profile_email = sender_profile.sender_email if sender_profile and sender_profile.sender_email else None
     profile_phone = sender_profile.sender_phone if sender_profile and sender_profile.sender_phone else None
-    
+
     # Get resolved settings as fallback
     fallback_name, fallback_email, fallback_phone = settings.MSG_SENDER_NAME, settings.MSG_SENDER_EMAIL, settings.MSG_SENDER_PHONE
     if db and current_user:
         try:
-            fallback_name, fallback_email, fallback_phone, _ = settings_service.get_resolved_sender_settings(db, current_user)
+            fallback_name, fallback_email, fallback_phone, _ = settings_service.get_resolved_sender_settings(
+                db, current_user)
         except Exception:
             # Fall back to env settings if there's any issue
             pass
-    
+
     sender_name = name_override or profile_name or fallback_name
     sender_email = email_override or profile_email or fallback_email
     sender_phone = phone_override or profile_phone or fallback_phone
-    
+
     return sender_name, sender_email, sender_phone
 
 

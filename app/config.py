@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     MSG_SENDER_EMAIL: str = Field("no-reply@caresphere.app", alias="MSG_EMAIL")
     MSG_SENDER_PHONE: str = Field("+10000000000", alias="MSG_PHONE")
 
+    # EKDSend Email API
+    EKDSEND_API_KEY: str = Field("", alias="EKDSEND_API_KEY")
+    EKDSEND_API_URL: str = Field(
+        "https://es.ekddigital.com/api/v1", alias="EKDSEND_API_URL")
+
     # Features
     ENABLE_DEMO_DATA: bool = Field(False, alias="FEATURE_DEMO")
     ENABLE_ANALYTICS: bool = Field(True, alias="FEATURE_ANALYTICS")
