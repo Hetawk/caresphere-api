@@ -15,6 +15,7 @@ def main():
             check=True,
             capture_output=True,
             text=True
+            # 
         )
         print(result.stdout)
         print("✅ Migration completed successfully!")
