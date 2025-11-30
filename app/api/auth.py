@@ -40,7 +40,7 @@ router = APIRouter()
 async def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     user = auth_service.create_user(db, payload)
     access, refresh, expires = auth_service.issue_tokens(user)
-    
+
     # Send welcome email
     try:
         await send_welcome_email(
@@ -51,7 +51,7 @@ async def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to send welcome email to {user.email}: {e}")
         # Don't fail registration if email fails
-    
+
     response = AuthResponse(
         user=UserPublic.model_validate(user),
         accessToken=access,
@@ -141,7 +141,7 @@ async def forgot_password(
 
             await send_password_reset_email(
                 to=user.email,
-                user_name=user.first_name or user.email,
+                user_name=user.full_name or user.email,
                 reset_token=token,
                 reset_url=reset_url,
                 expires_in_hours=1,
