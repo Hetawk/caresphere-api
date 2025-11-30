@@ -26,6 +26,7 @@ from app.services import auth_service
 from app.services.transactional_email_service import (
     send_password_reset_email,
     send_verification_code_email,
+    send_welcome_email,
 )
 from app.utils import responses, security
 from app.utils.exceptions import AuthenticationError
@@ -39,6 +40,18 @@ router = APIRouter()
 async def register_user(payload: UserCreate, db: Session = Depends(get_db)):
     user = auth_service.create_user(db, payload)
     access, refresh, expires = auth_service.issue_tokens(user)
+    
+    # Send welcome email
+    try:
+        await send_welcome_email(
+            to=user.email,
+            user_name=user.full_name or user.email,
+        )
+        logger.info(f"Welcome email sent to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send welcome email to {user.email}: {e}")
+        # Don't fail registration if email fails
+    
     response = AuthResponse(
         user=UserPublic.model_validate(user),
         accessToken=access,
