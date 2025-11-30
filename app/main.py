@@ -70,7 +70,9 @@ async def health_check():
         "success": True,
         "data": {
             "status": "healthy",
-            "version": settings.APP_VERSION
+            "version": settings.APP_VERSION,
+            "email_configured": bool(settings.EKDSEND_API_KEY),
+            "api_base_url": settings.API_BASE_URL,
         }
     }
 
