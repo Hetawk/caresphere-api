@@ -3,8 +3,12 @@ CareSphere API - Main Application Entry Point
 FastAPI application with all routes, middleware, and configuration
 """
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.api import api_router
 from app.middleware.error_handler import init_exception_handlers
@@ -34,6 +38,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files directory for serving images (like logo)
+static_path = Path(__file__).parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+    logger.info(f"Static files mounted at /static from {static_path}")
 
 # Register routers and exception handlers
 app.include_router(api_router)

@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     EKDSEND_API_URL: str = Field(
         "https://es.ekddigital.com/api/v1", alias="EKDSEND_API_URL")
 
+    # API Base URL (for static assets in emails)
+    API_BASE_URL: str = Field(
+        "https://caresphere.ekddigital.com", alias="API_BASE_URL")
+
     # Features
     ENABLE_DEMO_DATA: bool = Field(False, alias="FEATURE_DEMO")
     ENABLE_ANALYTICS: bool = Field(True, alias="FEATURE_ANALYTICS")

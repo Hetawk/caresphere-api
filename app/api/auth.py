@@ -1,9 +1,12 @@
 """Authentication routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api import deps
+from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import (
@@ -20,8 +23,14 @@ from app.schemas.user import (
     VerifyEmailRequest,
 )
 from app.services import auth_service
+from app.services.transactional_email_service import (
+    send_password_reset_email,
+    send_verification_code_email,
+)
 from app.utils import responses, security
 from app.utils.exceptions import AuthenticationError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -108,20 +117,41 @@ async def forgot_password(
     payload: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    """Initiate password reset flow. Sends reset token via email (or returns it for dev)."""
+    """Initiate password reset flow. Sends reset token via email."""
     try:
         user, token = auth_service.initiate_password_reset(db, payload.email)
 
-        # TODO: In production, send token via email service
-        # For now, return token in response for development
-        response = MessageResponse(
-            message=f"Password reset token sent to {payload.email}. Token: {token} (dev only)"
-        )
+        # Send password reset email via EKDSend
+        try:
+            # Build reset URL (adjust based on your frontend URL)
+            reset_url = f"caresphere://reset-password?email={payload.email}&token={token}"
+
+            await send_password_reset_email(
+                to=user.email,
+                user_name=user.first_name or user.email,
+                reset_token=token,
+                reset_url=reset_url,
+                expires_in_hours=1,
+            )
+            logger.info(f"Password reset email sent to {payload.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {e}")
+            # Still return success to not leak info, but log the error
+
+        # In debug mode, also return the token for testing
+        if settings.DEBUG:
+            response = MessageResponse(
+                message=f"Password reset token sent to {payload.email}. Token: {token} (debug mode)"
+            )
+        else:
+            response = MessageResponse(
+                message=f"If an account exists with {payload.email}, a password reset link has been sent"
+            )
         return responses.success_response(response.model_dump())
     except Exception:
         # Return same message even if user not found (security best practice)
         response = MessageResponse(
-            message=f"If an account exists with {payload.email}, a password reset token has been sent"
+            message=f"If an account exists with {payload.email}, a password reset link has been sent"
         )
         return responses.success_response(response.model_dump())
 

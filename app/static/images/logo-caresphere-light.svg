@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <!-- CareSphere Logo - Light Mode -->
+    <!-- Brand colors: Primary #1F1C18, Gold #C8A061, Light Gold #D4AF6A -->
+
+    <defs>
+        <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#D4AF6A" />
+            <stop offset="100%" stop-color="#C8A061" />
+        </linearGradient>
+        <filter id="softShadow">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="8" />
+            <feOffset dx="0" dy="4" result="offsetblur" />
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.2" />
+            </feComponentTransfer>
+            <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background (transparent for versatility) -->
+    <rect width="1024" height="1024" fill="transparent" />
+
+    <!-- Outer decorative ring -->
+    <circle cx="512" cy="512" r="440" fill="none" stroke="#D4AF6A" stroke-width="3" opacity="0.15" />
+
+    <!-- Main circular background with gold gradient -->
+    <circle cx="512" cy="512" r="400" fill="url(#goldGradient)" opacity="0.25"
+        filter="url(#softShadow)" />
+
+    <!-- Core circle (brand primary) -->
+    <circle cx="512" cy="512" r="280" fill="#1F1C18" />
+
+    <!-- 'C' for Care - stylized cutout -->
+    <path
+        d="M 512 280 
+           A 232 232 0 0 1 744 512
+           A 232 232 0 0 1 512 744
+           L 512 680
+           A 168 168 0 0 0 680 512
+           A 168 168 0 0 0 512 344
+           Z"
+        fill="#F7F6F4" opacity="0.98" />
+
+    <!-- Heart icon in center representing care -->
+    <path
+        d="M 512 460
+           L 492 442
+           C 472 423 442 423 422 442
+           C 402 462 402 492 422 512
+           L 512 602
+           L 602 512
+           C 622 492 622 462 602 442
+           C 582 423 552 423 532 442
+           Z"
+        fill="#C8A061" />
+
+    <!-- Small connecting dots representing community -->
+    <circle cx="512" cy="220" r="16" fill="#D4AF6A" />
+    <circle cx="708" cy="316" r="14" fill="#D4AF6A" opacity="0.8" />
+    <circle cx="316" cy="708" r="14" fill="#D4AF6A" opacity="0.8" />
+    <circle cx="804" cy="512" r="12" fill="#C8A061" opacity="0.6" />
+
+    <title>CareSphere</title>
+    <desc>CareSphere brand mark for light mode - representing care, community, and connection</desc>
+</svg>

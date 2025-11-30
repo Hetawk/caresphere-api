@@ -1,10 +1,18 @@
-# EKDSend Email API - Usage Guide
+# EKDSend Email API - Complete Usage Guide
 
-> Send emails, SMS, and voice messages via a simple REST API. Built for developers.
+> Unified email, SMS, and voice messaging over a single `/send` endpoint, with message search, sandbox inbox, and quotas built-in.
 
-## Quick Start
+This guide is modeled after `XTERM_API_USAGE.md` and `ASSETS_API_USAGE.md` and reflects the **actual implementation** under `src/app/api/v1`.
 
-**Base URL:** `https://es.ekddigital.com/api/v1`
+---
+
+## 1. Quick Start
+
+**Base URL**
+
+```text
+https://es.ekddigital.com/api/v1
+```
 
 **Authentication:** Bearer token (API Key)
 
@@ -20,53 +28,107 @@ curl -X POST https://es.ekddigital.com/api/v1/send \
   }'
 ```
 
----
-
-## 1. Getting Your API Key
-
-### Option A: Via Dashboard
-
-1. Login to [es.ekddigital.com](https://es.ekddigital.com)
-2. Go to **Settings** → **API Keys**
-3. Click **Create New Key**
-4. Choose scopes: `send:email`, `send:sms`, `send:voice`
-5. **Save the key immediately** - it's only shown once!
-
-### Option B: Via API (if you already have a key)
-
-```bash
-# Create a new API key
-curl -X POST https://es.ekddigital.com/api/v1/api-keys \
-  -H "Authorization: Bearer ek_live_existing_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Production Email Key",
-    "scopes": ["send:email", "send:sms"],
-    "expiresInDays": 365
-  }'
-```
-
-**Response:**
+On success, the API responds with:
 
 ```json
 {
-  "message": "API key created successfully",
-  "apiKey": {
-    "id": "clxyz123",
-    "name": "Production Email Key",
-    "key": "ek_live_abc123xyz789...",
-    "scopes": ["send:email", "send:sms"],
-    "expiresAt": "2026-11-26T00:00:00.000Z"
-  },
-  "warning": "⚠️ Save this key securely. It will not be shown again."
+  "success": true,
+  "messageId": "msg_1234567890",
+  "type": "email",
+  "queuedAt": "2025-11-26T14:30:00.000Z"
 }
 ```
 
 ---
 
-## 2. Send Email
+## 2. Authentication & Scopes
 
-### Basic Email
+Every request to `/api/v1/send` and the messages/sandbox endpoints must include a valid API key with the right scopes.
+
+**Header format:**
+
+```http
+Authorization: Bearer ek_live_your_api_key_here
+```
+
+### Required Scopes
+
+| Feature              | Scope                                                    |
+| -------------------- | -------------------------------------------------------- |
+| Send Email           | `send:email`                                             |
+| Send SMS             | `send:sms`                                               |
+| Send Voice           | `send:voice`                                             |
+| List/Search Messages | `messages:read` (configured in backend)                  |
+| Sandbox Inbox        | `sandbox:read` / `sandbox:write` (configured in backend) |
+
+If the scope for the selected `type` is missing, the API returns `403 FORBIDDEN`.
+
+> The `authenticate` + `checkScope` logic lives in `src/lib/auth/middleware.ts` and `src/lib/auth/apiKey.ts`.
+
+---
+
+## 3. The `/send` Endpoint
+
+**Endpoint:**
+
+```http
+POST /api/v1/send
+```
+
+This is a **unified** endpoint for:
+
+- Email (`type: "email"`)
+- SMS (`type: "sms"`)
+- Voice (`type: "voice"`)
+
+Behind the scenes, the handler:
+
+- Authenticates the API key
+- Enforces rate limits (`RATE_LIMITS["send:basic"]`)
+- Enforces quotas per customer (`enforceQuota`)
+- Validates and normalizes the payload
+- Stores a `message` record in the database (`prisma.message.create`)
+- Queues work to the appropriate worker (`queueEmail`, `queueSms`, `queueVoice`)
+
+### 3.1 Request Shape (Typed)
+
+```ts
+// Email
+interface SendEmailRequest {
+  type: "email";
+  to: string | string[];
+  from?: string;
+  subject: string;
+  body?: string; // direct HTML/text body
+  template?: string; // builtin template key
+  templateData?: Record<string, unknown>;
+  cc?: string[];
+  bcc?: string[];
+  replyTo?: string;
+}
+
+// SMS
+interface SendSmsRequest {
+  type: "sms";
+  to: string | string[];
+  from?: string;
+  body?: string; // direct SMS text
+  template?: string;
+  templateData?: Record<string, unknown>;
+}
+
+// Voice
+interface SendVoiceRequest {
+  type: "voice";
+  to: string;
+  from?: string;
+  body?: string; // TTS text or script
+  template?: string;
+  templateData?: Record<string, unknown>;
+}
+```
+
+### 3.2 Send Email (Basic)
 
 ```bash
 curl -X POST https://es.ekddigital.com/api/v1/send \
@@ -80,21 +142,13 @@ curl -X POST https://es.ekddigital.com/api/v1/send \
   }'
 ```
 
-### Multiple Recipients
+**Notes (from implementation):**
 
-```bash
-curl -X POST https://es.ekddigital.com/api/v1/send \
-  -H "Authorization: Bearer ek_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "email",
-    "to": ["user1@example.com", "user2@example.com"],
-    "subject": "Team Update",
-    "body": "Hello team, here is the weekly update..."
-  }'
-```
+- `to` can be a string or an array of strings. Every address is validated with `validateEmail`.
+- `from` defaults to `process.env.ES_DEFAULT_FROM` if omitted.
+- Either `body` **or** `template` must be provided.
 
-### With CC, BCC, and Reply-To
+### 3.3 Email with CC/BCC/Reply-To
 
 ```bash
 curl -X POST https://es.ekddigital.com/api/v1/send \
@@ -111,7 +165,9 @@ curl -X POST https://es.ekddigital.com/api/v1/send \
   }'
 ```
 
-### Custom From Address
+If any address in `to`, `cc`, `bcc`, or `replyTo` is invalid, the API returns `400 VALIDATION_ERROR`.
+
+### 3.4 Multiple Recipients
 
 ```bash
 curl -X POST https://es.ekddigital.com/api/v1/send \
@@ -119,63 +175,17 @@ curl -X POST https://es.ekddigital.com/api/v1/send \
   -H "Content-Type: application/json" \
   -d '{
     "type": "email",
-    "to": "customer@example.com",
-    "from": "sales@yourdomain.com",
-    "subject": "Your Quote Request",
-    "body": "Thank you for your interest..."
+    "to": ["user1@example.com", "user2@example.com"],
+    "subject": "Team Update",
+    "body": "Hello team, here is the weekly update..."
   }'
 ```
 
-> **Note:** Custom `from` addresses require a verified domain.
+Quotas are enforced **per recipient** via `enforceQuota(customerId, "EMAIL", recipients.length)`.
 
----
+### 3.5 Using Built-in Templates
 
-## 3. Send SMS
-
-```bash
-curl -X POST https://es.ekddigital.com/api/v1/send \
-  -H "Authorization: Bearer ek_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "sms",
-    "to": "+1234567890",
-    "body": "Your verification code is: 123456"
-  }'
-```
-
-### Multiple SMS Recipients
-
-```bash
-curl -X POST https://es.ekddigital.com/api/v1/send \
-  -H "Authorization: Bearer ek_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "sms",
-    "to": ["+1234567890", "+0987654321"],
-    "body": "Flash sale! 50% off all items today only."
-  }'
-```
-
----
-
-## 4. Send Voice Call
-
-```bash
-curl -X POST https://es.ekddigital.com/api/v1/send \
-  -H "Authorization: Bearer ek_live_your_api_key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "voice",
-    "to": "+1234567890",
-    "body": "Hello, this is an automated call from ACME Corp. Your appointment is confirmed for tomorrow at 3 PM."
-  }'
-```
-
----
-
-## 5. Using Templates
-
-### Built-in Templates
+Email templates are resolved through `getEmailTemplate(templateKey)` and rendered with `renderTemplate`.
 
 ```bash
 curl -X POST https://es.ekddigital.com/api/v1/send \
@@ -192,79 +202,382 @@ curl -X POST https://es.ekddigital.com/api/v1/send \
   }'
 ```
 
-### Available Built-in Templates
+If `template` is provided but unknown, the API returns `400 VALIDATION_ERROR`.
 
-| Template Name    | Description          | Variables                            |
-| ---------------- | -------------------- | ------------------------------------ |
-| `welcome`        | Welcome email        | `name`, `company`                    |
-| `verification`   | Email verification   | `name`, `verificationUrl`            |
-| `password-reset` | Password reset       | `name`, `resetUrl`                   |
-| `invoice`        | Invoice notification | `invoiceNumber`, `amount`, `dueDate` |
+> The available template keys and shapes live in `src/lib/utils/templates/builtins.ts`.
+
+### 3.6 Send SMS
+
+```bash
+curl -X POST https://es.ekddigital.com/api/v1/send \
+  -H "Authorization: Bearer ek_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "sms",
+    "to": "+1234567890",
+    "body": "Your verification code is: 123456"
+  }'
+```
+
+**Implementation details:**
+
+- `to` can be a single E.164 number or an array.
+- Each number is validated with `validatePhone`.
+- Quotas are enforced with `enforceQuota(customerId, "SMS", recipients.length)`.
+
+### 3.7 Send Voice
+
+```bash
+curl -X POST https://es.ekddigital.com/api/v1/send \
+  -H "Authorization: Bearer ek_live_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "voice",
+    "to": "+1234567890",
+    "body": "Hello, this is an automated call from ACME Corp. Your appointment is confirmed for tomorrow at 3 PM."
+  }'
+```
+
+Voice messages are queued via `queueVoice` and stored with `channel: "VOICE"` in the `message` table. Extra call details (duration, callerId, audioUrl) are stored in `headers` and exposed in the `/messages/[id]` endpoint.
 
 ---
 
-## 6. Response Format
+## 4. Message Search & History
 
-### Success Response (202 Accepted)
+The Messages API gives you a unified view of all email/SMS/voice activity.
+
+### 4.1 List Messages
+
+**Endpoint:**
+
+```http
+GET /api/v1/messages
+```
+
+**Query Parameters (all optional):**
+
+| Name        | Type     | Description                                                             |
+| ----------- | -------- | ----------------------------------------------------------------------- |
+| `channel`   | string   | `email` \| `sms` \| `voice`                                             |
+| `direction` | string   | `inbound` \| `outbound`                                                 |
+| `status`    | string   | `queued` \| `sending` \| `sent` \| `delivered` \| `failed` \| `bounced` |
+| `from`      | string   | Partial match on sender                                                 |
+| `to`        | string   | Exact match in recipient array                                          |
+| `startDate` | ISO date | Filter `createdAt >=`                                                   |
+| `endDate`   | ISO date | Filter `createdAt <=`                                                   |
+| `search`    | string   | Searches subject, text body, and from                                   |
+| `page`      | number   | Default `1`                                                             |
+| `limit`     | number   | Default `50`, max `100`                                                 |
+| `sortBy`    | string   | One of: `createdAt`, `queuedAt`, `sentAt`, `deliveredAt`                |
+| `sortOrder` | string   | `asc` or `desc` (default)                                               |
+
+**Example:**
+
+```bash
+curl -X GET 'https://es.ekddigital.com/api/v1/messages?channel=email&status=delivered&page=1&limit=20' \
+  -H "Authorization: Bearer ek_live_your_api_key"
+```
+
+**Response Shape (simplified):**
 
 ```json
 {
   "success": true,
-  "messageId": "clxyz123abc456",
-  "type": "email",
-  "queuedAt": "2025-11-26T14:30:00.000Z"
-}
-```
-
-### Error Response
-
-```json
-{
-  "error": {
-    "message": "Invalid email address: bad-email",
-    "code": "VALIDATION_ERROR"
+  "data": {
+    "messages": [
+      {
+        "id": "msg_123",
+        "channel": "email",
+        "direction": "outbound",
+        "status": "DELIVERED",
+        "from": "no-reply@yourapp.com",
+        "to": ["user@example.com"],
+        "subject": "Welcome",
+        "preview": "Welcome to our platform...",
+        "queuedAt": "2025-11-26T14:30:00.000Z",
+        "sentAt": "2025-11-26T14:30:02.000Z",
+        "deliveredAt": "2025-11-26T14:30:03.000Z",
+        "error": null,
+        "providerId": "ses-123456",
+        "createdAt": "2025-11-26T14:29:59.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1,
+      "hasMore": false
+    },
+    "stats": {
+      "email": { "sent": 10, "delivered": 9, "failed": 1, "total": 10 },
+      "sms": { "sent": 5, "delivered": 5, "failed": 0, "total": 5 },
+      "voice": { "sent": 2, "delivered": 2, "failed": 0, "total": 2 }
+    },
+    "filters": {
+      "applied": { "channel": "EMAIL", "status": "DELIVERED" },
+      "available": {
+        "channels": ["email", "sms", "voice"],
+        "directions": ["inbound", "outbound"],
+        "statuses": [
+          "queued",
+          "sending",
+          "sent",
+          "delivered",
+          "failed",
+          "bounced"
+        ]
+      }
+    }
   }
 }
 ```
 
-### Common Error Codes
+### 4.2 Get a Single Message
 
-| Code               | HTTP Status | Description                |
-| ------------------ | ----------- | -------------------------- |
-| `VALIDATION_ERROR` | 400         | Invalid request data       |
-| `UNAUTHORIZED`     | 401         | Invalid or missing API key |
-| `FORBIDDEN`        | 403         | Insufficient scopes        |
-| `RATE_LIMITED`     | 429         | Too many requests          |
-| `QUOTA_EXCEEDED`   | 402         | Monthly quota exceeded     |
-| `INTERNAL_ERROR`   | 500         | Server error               |
+**Endpoint:**
+
+```http
+GET /api/v1/messages/{id}
+```
+
+```bash
+curl -X GET https://es.ekddigital.com/api/v1/messages/msg_123 \
+  -H "Authorization: Bearer ek_live_your_api_key"
+```
+
+**Response (simplified):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "msg_123",
+    "channel": "email",
+    "direction": "outbound",
+    "status": "DELIVERED",
+    "from": "no-reply@yourapp.com",
+    "to": ["user@example.com"],
+    "subject": "Welcome",
+    "textBody": "Welcome to our platform...",
+    "htmlBody": "<h1>Welcome</h1>...",
+    "headers": { "x-provider-message-id": "ses-123456" },
+    "templateVars": { "name": "John" },
+    "template": { "id": "tpl_welcome", "name": "Welcome", "channel": "EMAIL" },
+    "providerId": "ses-123456",
+    "providerResponse": "...raw provider payload...",
+    "error": null,
+    "timestamps": {
+      "created": "2025-11-26T14:29:59.000Z",
+      "queued": "2025-11-26T14:30:00.000Z",
+      "sent": "2025-11-26T14:30:02.000Z",
+      "delivered": "2025-11-26T14:30:03.000Z",
+      "bounced": null,
+      "complained": null
+    },
+    "callDetails": null,
+    "smsDetails": null
+  }
+}
+```
+
+For `channel === "VOICE"`, `callDetails` is populated from message headers:
+
+```json
+"callDetails": {
+  "duration": 35,
+  "callerId": "+15551230000",
+  "audioUrl": "https://.../recording.mp3"
+}
+```
+
+For `channel === "SMS"`, `smsDetails.segments` estimates the number of SMS segments.
+
+If the message does not belong to the authenticated customer or does not exist, the API returns `404 Message not found`.
 
 ---
 
-## 7. Rate Limits
+## 5. Sandbox Email Inbox
 
-| Plan       | Requests/min | Emails/month |
-| ---------- | ------------ | ------------ |
-| Starter    | 60           | 10,000       |
-| Pro        | 300          | 100,000      |
-| Enterprise | 1000         | Unlimited    |
+The sandbox endpoints allow you to test email flows **without sending real email**.
 
-Rate limit headers are included in every response:
+These endpoints are backed by `mailSink` in `src/lib/utils/sandbox/mailSink.ts` and are only available for authenticated customers.
 
+### 5.1 List Sandbox Emails
+
+**Endpoint:**
+
+```http
+GET /api/v1/sandbox/emails
 ```
+
+**Query Parameters:**
+
+| Name    | Type   | Description                        |
+| ------- | ------ | ---------------------------------- |
+| `limit` | number | Max emails to return (default: 50) |
+
+```bash
+curl -X GET 'https://es.ekddigital.com/api/v1/sandbox/emails?limit=20' \
+  -H "Authorization: Bearer ek_live_your_api_key"
+```
+
+**Response:**
+
+```json
+{
+  "emails": [
+    {
+      "id": "sbx_123",
+      "to": ["user@example.com"],
+      "from": "no-reply@yourapp.com",
+      "subject": "Welcome",
+      "html": "<h1>Welcome</h1>",
+      "text": "Welcome",
+      "createdAt": "2025-11-26T14:30:00.000Z"
+    }
+  ],
+  "count": 1,
+  "sandbox": true
+}
+```
+
+### 5.2 Clear Sandbox Emails
+
+**Endpoint:**
+
+```http
+DELETE /api/v1/sandbox/emails
+```
+
+```bash
+curl -X DELETE https://es.ekddigital.com/api/v1/sandbox/emails \
+  -H "Authorization: Bearer ek_live_your_api_key"
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "deleted": 42
+}
+```
+
+---
+
+## 6. Rate Limiting & Quotas
+
+The `/send` endpoint applies both **rate limits** and **monthly/plan quotas**.
+
+### 6.1 Rate Limits
+
+Configured via `RATE_LIMITS["send:basic"]` and enforced per API key using `checkRateLimit`.
+
+On every `/send` response, rate limit headers are added:
+
+```http
 X-RateLimit-Limit: 60
 X-RateLimit-Remaining: 45
 X-RateLimit-Reset: 1732631400
 ```
 
+If you exceed the limit, you get a `429` with a `RATE_LIMITED` error.
+
+### 6.2 Quotas
+
+Quotas are enforced per customer and per channel via `enforceQuota(customerId, channel, count)`.
+
+Typical channels:
+
+- `"EMAIL"`
+- `"SMS"`
+- `"VOICE"`
+
+If a quota is exceeded, the API returns an error similar to:
+
+```json
+{
+  "error": {
+    "message": "Monthly email quota exceeded",
+    "code": "QUOTA_EXCEEDED"
+  }
+}
+```
+
 ---
 
-## 8. Code Examples
+## 7. Error Model
 
-### JavaScript/TypeScript (Node.js)
+All errors are normalized via `handleApiError` in `src/lib/utils/api/errors.ts`.
 
-```typescript
-const sendEmail = async () => {
-  const response = await fetch("https://es.ekddigital.com/api/v1/send", {
+### 7.1 Validation Errors
+
+```json
+{
+  "error": {
+    "message": "Invalid email address: bad-email",
+    "code": "VALIDATION_ERROR",
+    "details": {
+      "field": "to"
+    }
+  }
+}
+```
+
+### 7.2 Authentication & Scope Errors
+
+```json
+{
+  "error": {
+    "message": "Invalid or missing API key",
+    "code": "UNAUTHORIZED"
+  }
+}
+```
+
+```json
+{
+  "error": {
+    "message": "API key does not have required scope: send:email",
+    "code": "FORBIDDEN"
+  }
+}
+```
+
+### 7.3 Rate Limit Errors
+
+```json
+{
+  "error": {
+    "message": "Rate limit exceeded. Try again later.",
+    "code": "RATE_LIMITED"
+  }
+}
+```
+
+### 7.4 Generic Server Errors
+
+```json
+{
+  "error": {
+    "message": "Internal server error",
+    "code": "INTERNAL_ERROR"
+  }
+}
+```
+
+---
+
+## 8. Language Examples
+
+The payloads shown above can be used from any HTTP client. Here are short examples for Node.js and Python.
+
+### 8.1 Node.js (fetch)
+
+```ts
+async function sendEmail() {
+  const res = await fetch("https://es.ekddigital.com/api/v1/send", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.EKDSEND_API_KEY}`,
@@ -278,128 +591,55 @@ const sendEmail = async () => {
     }),
   });
 
-  const result = await response.json();
-
-  if (result.success) {
-    console.log("Email queued:", result.messageId);
+  const data = await res.json();
+  if (data.success) {
+    console.log("Queued message:", data.messageId);
   } else {
-    console.error("Failed:", result.error.message);
+    console.error("Error:", data.error?.message || data.error);
   }
-};
+}
 ```
 
-### Python
+### 8.2 Python (requests)
 
 ```python
-import requests
 import os
+import requests
 
-def send_email(to, subject, body):
-    response = requests.post(
-        'https://es.ekddigital.com/api/v1/send',
+
+def send_email(to: str, subject: str, body: str) -> str:
+    resp = requests.post(
+        "https://es.ekddigital.com/api/v1/send",
         headers={
-            'Authorization': f'Bearer {os.environ["EKDSEND_API_KEY"]}',
-            'Content-Type': 'application/json',
+            "Authorization": f"Bearer {os.environ['EKDSEND_API_KEY']}",
+            "Content-Type": "application/json",
         },
         json={
-            'type': 'email',
-            'to': to,
-            'subject': subject,
-            'body': body,
-        }
+            "type": "email",
+            "to": to,
+            "subject": subject,
+            "body": body,
+        },
+        timeout=10,
     )
 
-    result = response.json()
-
-    if result.get('success'):
-        print(f'Email queued: {result["messageId"]}')
-        return result['messageId']
-    else:
-        raise Exception(result['error']['message'])
-
-# Usage
-send_email('user@example.com', 'Hello from Python', '<h1>It works!</h1>')
+    data = resp.json()
+    if data.get("success"):
+        return data["messageId"]
+    raise RuntimeError(data.get("error", {}).get("message", "Unknown error"))
 ```
 
-### PHP
+---
 
-```php
-<?php
+## 9. Summary
 
-function sendEmail($to, $subject, $body) {
-    $apiKey = getenv('EKDSEND_API_KEY');
+- Use **`POST /api/v1/send`** for all outbound channels (email, SMS, voice).
+- Use **`GET /api/v1/messages`** and **`GET /api/v1/messages/{id}`** to search and inspect activity.
+- Use **sandbox endpoints** to safely test email flows.
+- Respect **scopes, rate limits, and quotas** to keep your integration reliable.
 
-    $ch = curl_init('https://es.ekddigital.com/api/v1/send');
-
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_POSTFIELDS => json_encode([
-            'type' => 'email',
-            'to' => $to,
-            'subject' => $subject,
-            'body' => $body,
-        ]),
-    ]);
-
-    $response = curl_exec($ch);
-    $result = json_decode($response, true);
-
-    curl_close($ch);
-
-    if ($result['success']) {
-        echo "Email queued: " . $result['messageId'];
-        return $result['messageId'];
-    } else {
-        throw new Exception($result['error']['message']);
-    }
+If anything in this guide doesn’t match what you see from the live API, we can adjust the implementation or this document so they stay perfectly aligned.
 }
-
-// Usage
-sendEmail('user@example.com', 'Hello from PHP', '<h1>It works!</h1>');
-```
-
-### Go
-
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-)
-
-type SendRequest struct {
-    Type    string `json:"type"`
-    To      string `json:"to"`
-    Subject string `json:"subject"`
-    Body    string `json:"body"`
-}
-
-type SendResponse struct {
-    Success   bool   `json:"success"`
-    MessageID string `json:"messageId"`
-    Error     struct {
-        Message string `json:"message"`
-    } `json:"error"`
-}
-
-func sendEmail(to, subject, body string) (string, error) {
-    apiKey := os.Getenv("EKDSEND_API_KEY")
-
-    payload := SendRequest{
-        Type:    "email",
-        To:      to,
-        Subject: subject,
-        Body:    body,
-    }
 
     jsonData, _ := json.Marshal(payload)
 
@@ -421,17 +661,19 @@ func sendEmail(to, subject, body string) (string, error) {
         return result.MessageID, nil
     }
     return "", fmt.Errorf(result.Error.Message)
+
 }
 
 func main() {
-    msgID, err := sendEmail("user@example.com", "Hello from Go", "<h1>It works!</h1>")
-    if err != nil {
-        fmt.Println("Error:", err)
-        return
-    }
-    fmt.Println("Email queued:", msgID)
+msgID, err := sendEmail("user@example.com", "Hello from Go", "<h1>It works!</h1>")
+if err != nil {
+fmt.Println("Error:", err)
+return
 }
-```
+fmt.Println("Email queued:", msgID)
+}
+
+````
 
 ### Ruby
 
@@ -470,7 +712,7 @@ end
 
 # Usage
 send_email('user@example.com', 'Hello from Ruby', '<h1>It works!</h1>')
-```
+````
 
 ---
 
