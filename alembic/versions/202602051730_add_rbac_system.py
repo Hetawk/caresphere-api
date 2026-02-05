@@ -1,7 +1,7 @@
 """Add RBAC system with roles permissions and invitations
 
 Revision ID: 202602051730_add_rbac_system
-Revises: 202602051700_add_organization_to_members
+Revises: 202602051700
 Create Date: 2026-02-05 17:30:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
 revision = '202602051730_add_rbac_system'
-down_revision = '202602051700_add_organization_to_members'
+down_revision = '202602051700'
 branch_labels = None
 depends_on = None
 

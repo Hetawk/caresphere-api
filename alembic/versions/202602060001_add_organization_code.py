@@ -1,7 +1,7 @@
 """add organization_code to organizations
 
 Revision ID: 202602060001
-Revises: 202602051730
+Revises: 202602051730_add_rbac_system
 Create Date: 2026-02-05 23:15:00
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '202602060001'
-down_revision = '202602051730'
+down_revision = '202602051730_add_rbac_system'
 branch_labels = None
 depends_on = None
 
