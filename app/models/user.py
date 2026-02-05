@@ -49,7 +49,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     organization_id = Column(String(36), ForeignKey(
         "organizations.id"), nullable=True)
 
+    # Relationships
     organization = relationship("Organization", back_populates="users")
+    organization_memberships = relationship("OrganizationUser", foreign_keys="[OrganizationUser.user_id]", back_populates="user")
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<User id={self.id} email={self.email}>"
