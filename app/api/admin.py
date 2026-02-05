@@ -189,3 +189,42 @@ async def promote_user(
     )
 
     return responses.success_response(response.model_dump())
+
+
+@router.post("/bootstrap-admin")
+async def bootstrap_admin(
+    db: Session = Depends(get_db)
+):
+    """
+    Bootstrap endpoint to promote admin@jinanicf.com to super_admin.
+    This is a one-time setup endpoint that requires no authentication.
+    """
+    target_email = "admin@jinanicf.com"
+
+    # Find target user
+    target_user = db.query(User).filter(User.email == target_email).first()
+
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with email {target_email} not found. Please register first."
+        )
+
+    # Update to super admin
+    old_role = target_user.role
+    target_user.role = UserRole.SUPER_ADMIN
+    target_user.email_verified = True
+    target_user.status = UserStatus.ACTIVE
+
+    db.commit()
+    db.refresh(target_user)
+
+    logger.info(
+        f"Bootstrap: Promoted {target_user.email} from {old_role} to SUPER_ADMIN")
+
+    return responses.success_response({
+        "message": f"Successfully promoted {target_user.email} to SUPER_ADMIN",
+        "email": target_user.email,
+        "role": target_user.role,
+        "oldRole": old_role
+    })

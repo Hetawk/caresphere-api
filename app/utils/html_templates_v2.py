@@ -539,51 +539,54 @@ def get_dashboard_html() -> str:
             
             async function loadUsers() {{
                 try {{
-                    // For now, show placeholder. In production, fetch from /admin/users
+                    const token = localStorage.getItem('token');
+                    
+                    if (!token) {{
+                        console.warn('No token available, showing login prompt');
+                        document.getElementById('users-loading').textContent = 'Please login to view users';
+                        document.getElementById('users-loading').style.display = 'block';
+                        document.getElementById('users-table').style.display = 'none';
+                        return;
+                    }}
+                    
                     const response = await fetch('/admin/users', {{
                         headers: {{
-                            'Authorization': `Bearer ${{localStorage.getItem('token') || ''}}`
+                            'Authorization': `Bearer ${{token}}`
                         }}
                     }});
                     
                     if (response.ok) {{
-                        const data = await response.json();
-                        users = data.data || [];
+                        const result = await response.json();
+                        console.log('API Response:', result);
+                        
+                        // Handle both formats: direct array or nested in data
+                        if (result.data && result.data.users) {{
+                            users = result.data.users;
+                        }} else if (result.users) {{
+                            users = result.users;
+                        }} else if (Array.isArray(result.data)) {{
+                            users = result.data;
+                        }} else {{
+                            console.error('Unexpected response format:', result);
+                            users = [];
+                        }}
+                        
+                        console.log('Loaded users:', users);
                         renderUsers();
                     }} else {{
-                        // Show sample data for now
-                        users = [
-                            {{
-                                id: '1',
-                                email: 'admin@jinanicf.com',
-                                fullName: 'Admin User',
-                                displayName: 'Admin',
-                                role: 'super_admin',
-                                status: 'active',
-                                createdAt: '2026-02-05T10:00:00Z'
-                            }}
-                        ];
-                        renderUsers();
+                        const errorText = await response.text();
+                        console.error('Failed to load users:', response.status, errorText);
+                        document.getElementById('users-loading').textContent = `Failed to load users: ${{response.status}}. Please login again.`;
+                        users = [];
                     }}
                 }} catch (error) {{
                     console.error('Error loading users:', error);
-                    // Show sample data on error
-                    users = [
-                        {{
-                            id: '1',
-                            email: 'admin@jinanicf.com',
-                            fullName: 'Admin User',
-                            displayName: 'Admin',
-                            role: 'super_admin',
-                            status: 'active',
-                            createdAt: '2026-02-05T10:00:00Z'
-                        }}
-                    ];
-                    renderUsers();
+                    document.getElementById('users-loading').textContent = 'Error loading users: ' + error.message;
+                    users = [];
                 }}
                 
-                document.getElementById('users-loading').style.display = 'none';
-                document.getElementById('users-table').style.display = 'table';
+                document.getElementById('users-loading').style.display = users.length === 0 ? 'block' : 'none';
+                document.getElementById('users-table').style.display = users.length > 0 ? 'table' : 'none';
             }}
             
             function renderUsers() {{
