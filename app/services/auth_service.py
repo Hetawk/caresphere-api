@@ -16,8 +16,12 @@ from app.utils import security
 from app.utils.exceptions import AuthenticationError, ConflictError, ValidationError
 
 
-def create_user(db: Session, payload: UserCreate, *, role: UserRole = UserRole.MEMBER) -> User:
-    """Create a new user enforcing unique email constraint."""
+def create_user(db: Session, payload: UserCreate, *, role: UserRole = UserRole.ADMIN) -> User:
+    """Create a new user enforcing unique email constraint.
+    
+    Default role is ADMIN to allow full access to app features.
+    For production, consider a more granular role assignment flow.
+    """
     user = User(
         email=payload.email.lower(),
         full_name=payload.fullName,
