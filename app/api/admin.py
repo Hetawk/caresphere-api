@@ -191,13 +191,14 @@ async def promote_user(
     return responses.success_response(response.model_dump())
 
 
-@router.post("/bootstrap-admin")
+@router.get("/bootstrap-admin")
 async def bootstrap_admin(
     db: Session = Depends(get_db)
 ):
     """
     Bootstrap endpoint to promote admin@jinanicf.com to super_admin.
     This is a one-time setup endpoint that requires no authentication.
+    Just visit this URL in your browser to activate.
     """
     target_email = "admin@jinanicf.com"
 
