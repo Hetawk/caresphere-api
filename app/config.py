@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(..., alias="DB_URL")
     DB_ECHO: bool = Field(False, alias="DB_ECHO")
 
+    # Individual DB connection parameters (optional, for migration scripts)
+    DB_HOST: str = Field("localhost", alias="DB_HOST")
+    DB_PORT: int = Field(3306, alias="DB_PORT")
+    DB_USER: str = Field("", alias="DB_USER")
+    DB_PASSWORD: str = Field("", alias="DB_PASSWORD")
+    DB_NAME: str = Field("", alias="DB_NAME")
+
     # Security
     JWT_SECRET: str = Field(..., alias="JWT_SECRET")
     JWT_ALG: str = Field("HS256", alias="JWT_ALG")

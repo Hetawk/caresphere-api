@@ -8,19 +8,24 @@ from app.models.message import Message, MessageRecipient, MessageSenderProfile
 from app.models.setting import SenderSetting
 from app.models.template import Template
 from app.models.automation import AutomationRule, AutomationLog
+from app.models.role import Permission, Role, OrganizationUser, UserInvitation
 
 __all__ = [
-	"Base",
-	"User",
-	"Organization",
-	"Member",
-	"MemberNote",
-	"MemberActivity",
-	"Message",
-	"MessageRecipient",
-	"MessageSenderProfile",
-	"SenderSetting",
-	"Template",
-	"AutomationRule",
-	"AutomationLog",
+    "Base",
+    "User",
+    "Organization",
+    "Member",
+    "MemberNote",
+    "MemberActivity",
+    "Message",
+    "MessageRecipient",
+    "MessageSenderProfile",
+    "SenderSetting",
+    "Template",
+    "AutomationRule",
+    "AutomationLog",
+    "Permission",
+    "Role",
+    "OrganizationUser",
+    "UserInvitation",
 ]

@@ -34,21 +34,6 @@ class BulkImportResult(BaseModel):
     errorDetails: List[dict]
 
 
-@router.post("/members/import", response_model=BulkImportResult)
-async def import_members_csv(
-    file: UploadFile = File(..., description="CSV file with member data"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(deps.require_roles(*ADMIN_ROLES)),
-):
-    """
-    Import members from CSV file.
-
-    Required columns:
-    - firstName
-    - lastName
-
-
-
 @router.post("/members/import")
 async def import_members_csv(
     file: UploadFile = File(...),
@@ -164,17 +149,17 @@ async def import_members_csv(
 async def download_import_template(
     _: User = Depends(deps.get_current_user)
 ):
-    """Download CSV template for member import ."""
+    """Download CSV template for member import."""
     from fastapi.responses import StreamingResponse
 
-    template = """firstName, lastName, email, phoneNumber, whatsAppNumber, weChatID, country, school, gender, tags, notes
-John, Doe, john.doe@example.com, 1234567890, 1234567890, johndoe123, USA, University of Example, Male, "choir,youth", Regular attendee
-Jane, Smith, jane.smith@example.com, 0987654321, 0987654321, janesmith456, Canada, Example College, Female, music, New member
-Enoch Kwateh, Dongbo, ekd@ekddigital.com, 8618506832159, 8618506832159, EKD231777285010, Liberia, University of Jinan, Male, "management,prayer,music", Service Management Team
-"""
-    
+    # CSV template data
+    csv_content = "firstName,lastName,email,phoneNumber,whatsAppNumber,weChatID,country,school,gender,tags,notes\n"
+    csv_content += "John,Doe,john.doe@example.com,1234567890,1234567890,johndoe123,USA,University of Example,Male,\"choir,youth\",Regular attendee\n"
+    csv_content += "Jane,Smith,jane.smith@example.com,9876543210,9876543210,janesmith456,Canada,Example College,Female,music,New member\n"
+    csv_content += "Enoch Kwateh,Dongbo,ekd@ekddigital.com,8618506832159,8618506832159,EKD231777285010,Liberia,University of Jinan,Male,\"management,prayer,music\",Service Management Team\n"
+
     return StreamingResponse(
-        io.StringIO(template),
+        io.StringIO(csv_content),
         media_type="text/csv",
         headers={
             "Content-Disposition": "attachment; filename=members_import_template.csv"
