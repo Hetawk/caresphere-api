@@ -40,25 +40,51 @@ class EmailService:
         Send an email via EKDSend API.
 
         Args:
-            to: Recipient email address(es)
-            subject: Email subject line
+            to: Recipient email address(es) - max 50 total recipients
+            subject: Email subject line (max 998 characters)
             body: Email body content (HTML supported)
-            from_email: Custom sender email (requires verified domain)
+            from_email: Custom sender email (requires verified domain via API)
             from_name: Custom sender name
             cc: Carbon copy recipients
             bcc: Blind carbon copy recipients
             reply_to: Reply-to email address
-            template: Built-in template name (welcome, verification, etc.)
+            template: Built-in template name (welcome, verification, passwordReset, etc.)
             template_data: Variables for template substitution
 
         Returns:
             Dict with success status and messageId
 
         Raises:
-            EmailSendError: If the API request fails
+            EmailConfigError: If API key is not configured
+            EmailSendError: If validation fails or API request fails
         """
         if not self.api_key:
             raise EmailConfigError("EKDSEND_API_KEY is not configured")
+
+        # Validate recipient count (max 50 total)
+        to_list = [to] if isinstance(to, str) else to
+        cc_list = cc or []
+        bcc_list = bcc or []
+        total_recipients = len(to_list) + len(cc_list) + len(bcc_list)
+
+        if total_recipients > 50:
+            raise EmailSendError(
+                f"Total recipients ({total_recipients}) exceeds maximum of 50",
+                code="VALIDATION_ERROR"
+            )
+
+        if total_recipients == 0:
+            raise EmailSendError(
+                "At least one recipient is required",
+                code="VALIDATION_ERROR"
+            )
+
+        # Validate subject length (max 998 characters)
+        if subject and len(subject) > 998:
+            raise EmailSendError(
+                f"Subject length ({len(subject)}) exceeds maximum of 998 characters",
+                code="VALIDATION_ERROR"
+            )
 
         # Build the request payload
         payload: Dict[str, Any] = {
@@ -100,7 +126,8 @@ class EmailService:
 
                 result = response.json()
 
-                if response.status_code == 202 and result.get("success"):
+                # Handle successful response (200, 201, or 202 status codes)
+                if response.status_code in (200, 201, 202) and result.get("success"):
                     logger.info(
                         f"Email queued successfully. MessageId: {result.get('messageId')}"
                     )
@@ -114,7 +141,7 @@ class EmailService:
                         "message", "Unknown error")
                     error_code = result.get("error", {}).get("code", "UNKNOWN")
                     logger.error(
-                        f"Email send failed: {error_code} - {error_msg}")
+                        f"Email send failed [{response.status_code}]: {error_code} - {error_msg}")
                     raise EmailSendError(error_msg, code=error_code)
 
             except httpx.TimeoutException:
@@ -123,6 +150,10 @@ class EmailService:
             except httpx.RequestError as e:
                 logger.error(f"Email API request failed: {e}")
                 raise EmailSendError(str(e), code="REQUEST_ERROR")
+            except Exception as e:
+                logger.error(f"Unexpected error sending email: {e}")
+                raise EmailSendError(
+                    f"Unexpected error: {str(e)}", code="UNKNOWN_ERROR")
 
     async def send_sms(
         self,

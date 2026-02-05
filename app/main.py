@@ -77,6 +77,43 @@ async def health_check():
     }
 
 
+@app.get("/test-email")
+async def test_email():
+    """Test endpoint to debug email sending"""
+    from app.services.email_service import send_email, EmailSendError, EmailConfigError
+    
+    try:
+        result = await send_email(
+            to="ekddigital@ekddigital.com",
+            subject="CareSphere Test Email",
+            body="<h1>Test Email</h1><p>This is a test email from CareSphere to verify email sending works.</p>",
+        )
+        return {
+            "success": True,
+            "message": "Email sent successfully",
+            "result": result
+        }
+    except EmailConfigError as e:
+        return {
+            "success": False,
+            "error_type": "config_error",
+            "message": str(e)
+        }
+    except EmailSendError as e:
+        return {
+            "success": False,
+            "error_type": "send_error", 
+            "message": str(e)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error_type": "unexpected_error",
+            "message": str(e),
+            "type": type(e).__name__
+        }
+
+
 # TODO: Import and include routers here
 # from app.api import auth, members, messages, templates, automation, analytics
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
