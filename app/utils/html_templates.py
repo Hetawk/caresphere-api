@@ -189,7 +189,8 @@ def get_dashboard_html() -> str:
                 
                 <div class="nav-section">
                     <h3>Main</h3>
-                    <a href="/dashboard" class="nav-link active">📊 Dashboard</a>
+                    <a href="#dashboard" class="nav-link active" onclick="showSection('dashboard')">📊 Dashboard</a>
+                    <a href="#users" class="nav-link" onclick="showSection('users')">👤 User Management</a>
                     <a href="/docs" class="nav-link">📚 API Docs</a>
                     <a href="/redoc" class="nav-link">📖 ReDoc</a>
                 </div>
