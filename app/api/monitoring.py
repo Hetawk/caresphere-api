@@ -8,8 +8,8 @@ from typing import Dict, Any
 
 from app.database import get_db
 from app.models.message import Message
-from app.schemas.auth import User
-from app.api.deps import get_current_active_user
+from app.models.user import User
+from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
@@ -31,7 +31,7 @@ async def health_check() -> Dict[str, Any]:
 @router.get("/stats")
 async def get_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Get email sending statistics.
@@ -113,7 +113,7 @@ async def get_stats(
 async def get_recent_messages(
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """
     Get recent messages.
