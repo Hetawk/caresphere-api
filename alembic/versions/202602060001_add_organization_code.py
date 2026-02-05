@@ -22,15 +22,15 @@ def upgrade() -> None:
         'organizations',
         sa.Column('organization_code', sa.String(7), nullable=True)
     )
-    
+
     # Generate codes for existing organizations using Python
     connection = op.get_bind()
     from random import randint
-    
+
     # Get all organizations
     result = connection.execute(sa.text("SELECT id FROM organizations"))
     org_ids = [row[0] for row in result]
-    
+
     # Generate unique codes
     used_codes = set()
     for org_id in org_ids:
@@ -39,15 +39,18 @@ def upgrade() -> None:
             if code not in used_codes:
                 used_codes.add(code)
                 connection.execute(
-                    sa.text("UPDATE organizations SET organization_code = :code WHERE id = :id"),
+                    sa.text(
+                        "UPDATE organizations SET organization_code = :code WHERE id = :id"),
                     {"code": code, "id": org_id}
                 )
                 break
-    
+
     # Make the column non-nullable and unique
     op.alter_column('organizations', 'organization_code', nullable=False)
-    op.create_unique_constraint('uq_organization_code', 'organizations', ['organization_code'])
-    op.create_index('idx_organization_code', 'organizations', ['organization_code'])
+    op.create_unique_constraint(
+        'uq_organization_code', 'organizations', ['organization_code'])
+    op.create_index('idx_organization_code',
+                    'organizations', ['organization_code'])
 
 
 def downgrade() -> None:

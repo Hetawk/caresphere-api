@@ -73,7 +73,7 @@ async def register_with_organization(
 ):
     """
     Register a new user with organization options.
-    
+
     Options:
     - create: Create a new organization (user becomes super admin)
     - join: Join existing organization using 7-digit code
@@ -83,38 +83,42 @@ async def register_with_organization(
     user = auth_service.create_user(db, payload)
     org_service = OrganizationService()
     org_data = None
-    
+
     try:
         # Handle organization action
         if organization.action == "create":
             # Validate organization name provided
             if not organization.name:
-                raise ValueError("Organization name is required when action is 'create'")
-            
+                raise ValueError(
+                    "Organization name is required when action is 'create'")
+
             # Create organization with user as super admin
             from app.schemas.organization import OrganizationCreate
-            org_create = OrganizationCreate(name=organization.name, slug=organization.name.lower().replace(" ", "-"))
+            org_create = OrganizationCreate(
+                name=organization.name, slug=organization.name.lower().replace(" ", "-"))
             org = org_service.create_organization(db, org_create, user)
             org_data = OrganizationWithCode.model_validate(org)
-            
+
         elif organization.action == "join":
             # Validate code provided
             if not organization.code:
-                raise ValueError("Organization code is required when action is 'join'")
-            
+                raise ValueError(
+                    "Organization code is required when action is 'join'")
+
             # Join organization
             org = org_service.join_organization(db, organization.code, user)
             if not org:
-                raise ValueError("Invalid organization code or organization not active")
-            
+                raise ValueError(
+                    "Invalid organization code or organization not active")
+
             from app.schemas.organization import OrganizationPublic
             org_data = OrganizationPublic.model_validate(org)
-        
+
         # action == "skip" - no organization setup
-        
+
         # Issue tokens
         access, refresh, expires = auth_service.issue_tokens(user)
-        
+
         # Send welcome email
         try:
             await send_welcome_email(
@@ -124,7 +128,7 @@ async def register_with_organization(
             logger.info(f"Welcome email sent to {user.email}")
         except Exception as e:
             logger.error(f"Failed to send welcome email to {user.email}: {e}")
-        
+
         # Build response
         response_data = {
             "user": UserPublic.model_validate(user).model_dump(by_alias=True),
@@ -132,12 +136,12 @@ async def register_with_organization(
             "refreshToken": refresh,
             "expiresIn": expires,
         }
-        
+
         if org_data:
             response_data["organization"] = org_data.model_dump(by_alias=True)
-        
+
         return responses.success_response(response_data, status_code=status.HTTP_201_CREATED)
-        
+
     except ValueError as e:
         # Rollback user creation if organization setup fails
         db.delete(user)

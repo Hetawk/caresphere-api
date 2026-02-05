@@ -14,7 +14,8 @@ class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     name = Column(String(255), nullable=False)
     slug = Column(String(255), unique=True, nullable=False)
-    organization_code = Column(String(7), unique=True, nullable=False, index=True)
+    organization_code = Column(
+        String(7), unique=True, nullable=False, index=True)
     domain = Column(String(255), nullable=True)
     settings = Column(JSON, default=dict)
     is_active = Column(Boolean, nullable=False, default=True)
