@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import analytics, auth, automation, fields, members, messages, settings, templates
+from app.api import analytics, auth, automation, fields, members, messages, settings, templates, monitoring
 
 api_router = APIRouter()
 
@@ -20,3 +20,5 @@ api_router.include_router(
     analytics.router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(
     fields.router, prefix="/fields", tags=["Field Configuration"])
+api_router.include_router(
+    monitoring.router, tags=["Monitoring & Statistics"])

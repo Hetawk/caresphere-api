@@ -8,12 +8,14 @@
 ## 🔒 Secret Management
 
 ### ✅ Environment Variables Protected
+
 - [x] `.env` file is in `.gitignore`
 - [x] `.env` has never been committed to git history
 - [x] `.env.example` contains NO real secrets
 - [x] All secrets are loaded from environment variables only
 
 ### 🔑 Current Secrets (NEVER commit these)
+
 ```bash
 # These are EXAMPLES - never commit actual values
 JWT_SECRET="your-secret-key-here"
@@ -22,6 +24,7 @@ DB_URL="mysql+pymysql://user:pass@host:port/db"
 ```
 
 ### ✅ Files to NEVER Commit
+
 - `.env` - Contains production secrets
 - `.venv/` - Virtual environment
 - `__pycache__/` - Python cache
@@ -33,11 +36,13 @@ DB_URL="mysql+pymysql://user:pass@host:port/db"
 ## 🌐 API Configuration
 
 ### ✅ Production URLs
+
 - **API Base URL:** `https://caresphere.ekddigital.com`
 - **Email Service:** `https://es.ekddigital.com/api/v1`
 - **Database:** Remote MySQL server (credentials in `.env`)
 
 ### ✅ CORS Configuration
+
 ```python
 CORS_ORIGINS="http://localhost:3000,https://caresphere.ekddigital.com,https://www.caresphere.ekddigital.com"
 ```
@@ -47,12 +52,15 @@ CORS_ORIGINS="http://localhost:3000,https://caresphere.ekddigital.com,https://ww
 ## 📊 Monitoring & Dashboard Options
 
 ### Option 1: FastAPI Built-in (Current) ✅
+
 **What you have now:**
+
 - `/` - Health check endpoint with version info
 - `/docs` - Swagger UI for API testing
 - `/redoc` - ReDoc documentation
 
 **Access:**
+
 ```bash
 # Health check
 curl https://caresphere.ekddigital.com/
@@ -67,11 +75,13 @@ https://caresphere.ekddigital.com/redoc
 ### Option 2: Lightweight Monitoring Dashboard (Recommended)
 
 **FastAPI Admin** - Simple admin panel for your data:
+
 ```bash
 pip install fastapi-admin
 ```
 
 Benefits:
+
 - View database records
 - Monitor API requests
 - User management
@@ -80,16 +90,19 @@ Benefits:
 ### Option 3: Professional Monitoring (If needed)
 
 **1. Grafana + Prometheus** (Best for metrics)
+
 - Real-time metrics
 - Custom dashboards
 - Alerting system
 
 **2. Sentry** (Best for error tracking)
+
 - Automatic error reporting
 - Performance monitoring
 - User context
 
 **3. DataDog / New Relic** (Enterprise)
+
 - Full stack monitoring
 - APM (Application Performance Monitoring)
 - Log aggregation
@@ -103,6 +116,7 @@ Benefits:
 **✅ You're good as-is!** Your API already provides:
 
 1. **Health Monitoring:**
+
    ```bash
    curl https://caresphere.ekddigital.com/
    # {"success":true,"data":{"message":"Welcome to CareSphere API","version":"1.0.0","status":"running"}}
@@ -155,6 +169,7 @@ async def get_stats(
 ## 🔐 Security Best Practices
 
 ### ✅ Currently Implemented
+
 - [x] Environment-based configuration
 - [x] Secrets in `.env` (gitignored)
 - [x] JWT authentication
@@ -165,6 +180,7 @@ async def get_stats(
 - [x] HTTPS in production
 
 ### 🎯 Recommendations
+
 - [ ] Add rate limiting for API endpoints
 - [ ] Implement API key rotation schedule
 - [ ] Set up automated security scanning
@@ -176,6 +192,7 @@ async def get_stats(
 ## 📝 Before Each Deployment
 
 ### Checklist:
+
 - [ ] Verify `.env` is NOT being committed
 - [ ] Check no secrets in code or config files
 - [ ] Update `.env.example` with new variables (without values)
@@ -189,18 +206,20 @@ async def get_stats(
 ## 🆘 If Secrets Are Exposed
 
 ### Immediate Actions:
+
 1. **Rotate ALL exposed secrets immediately:**
    - Generate new JWT_SECRET
    - Create new EKDSEND_API_KEY
    - Change database password
 
 2. **If committed to git:**
+
    ```bash
    # Remove from git history (use with caution)
    git filter-branch --force --index-filter \
      "git rm --cached --ignore-unmatch .env" \
      --prune-empty --tag-name-filter cat -- --all
-   
+
    # Force push (dangerous!)
    git push origin --force --all
    ```

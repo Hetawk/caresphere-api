@@ -44,6 +44,18 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+._*
+.AppleDouble
+.LSOverride
+
+# macOS specific
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.fseventsd
+.TemporaryItems
+.apdisk
 
 # Testing
 .pytest_cache/
