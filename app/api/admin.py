@@ -103,8 +103,8 @@ async def update_user(
         target_user.status = payload.status
     if payload.emailVerified is not None:
         target_user.email_verified = payload.emailVerified
-    if payload.password is not None:
-        # Hash the new password
+    if payload.password is not None and payload.password.strip():
+        # Hash the new password (only if not empty)
         from app.utils.security import hash_password
         target_user.password_hash = hash_password(payload.password)
 
