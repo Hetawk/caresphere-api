@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import admin, analytics, auth, automation, bulk, fields, members, messages, settings, templates, monitoring, dashboard
+from app.api import admin, analytics, auth, automation, bulk, fields, members, messages, settings, templates, monitoring, dashboard, organizations
 
 api_router = APIRouter()
 
@@ -10,6 +10,7 @@ api_router = APIRouter()
 api_router.include_router(dashboard.router)
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(organizations.router, prefix="/organizations", tags=["Organizations"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 api_router.include_router(bulk.router, prefix="/bulk",
                           tags=["Bulk Operations"])
