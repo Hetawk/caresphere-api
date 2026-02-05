@@ -2,15 +2,21 @@
 """
 Check organization table structure
 """
+import os
 import pymysql
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 DB_CONFIG = {
-    'host': '31.97.41.230',
-    'port': 9909,
-    'user': 'hetawk',
-    'password': 'Kwatehekd7!',
-    'database': 'church_connect'
+    'host': os.getenv('DB_HOST'),
+    'port': int(os.getenv('DB_PORT', 3306)),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
+
 
 def check_table():
     conn = pymysql.connect(**DB_CONFIG)
@@ -19,6 +25,7 @@ def check_table():
     print(result[1])
     cursor.close()
     conn.close()
+
 
 if __name__ == "__main__":
     check_table()

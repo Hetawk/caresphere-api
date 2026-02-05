@@ -2,15 +2,20 @@
 """
 Run the RBAC migration SQL directly on the database
 """
+import os
 import pymysql
+from dotenv import load_dotenv
 
-# Database connection details
+# Load environment variables
+load_dotenv()
+
+# Database connection details from environment
 DB_CONFIG = {
-    'host': '31.97.41.230',
-    'port': 9909,
-    'user': 'hetawk',
-    'password': 'Kwatehekd7!',
-    'database': 'church_connect'
+    'host': os.getenv('DB_HOST'),
+    'port': int(os.getenv('DB_PORT', 3306)),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
 
 # Read the migration SQL
@@ -105,6 +110,7 @@ INSERT INTO `alembic_version` (`version_num`) VALUES ('202602051730')
 ON DUPLICATE KEY UPDATE `version_num` = '202602051730';
 """
 
+
 def run_migration():
     """Execute the migration SQL"""
     try:
@@ -112,7 +118,7 @@ def run_migration():
         print("Connecting to database...")
         conn = pymysql.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        
+
         # Execute migration
         print("Running migration SQL...")
         for statement in migration_sql.split(';'):
@@ -120,11 +126,11 @@ def run_migration():
             if statement:
                 print(f"Executing: {statement[:80]}...")
                 cursor.execute(statement)
-        
+
         # Commit changes
         conn.commit()
         print("✅ Migration completed successfully!")
-        
+
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         if 'conn' in locals():
@@ -134,6 +140,7 @@ def run_migration():
             cursor.close()
         if 'conn' in locals():
             conn.close()
+
 
 if __name__ == "__main__":
     run_migration()
