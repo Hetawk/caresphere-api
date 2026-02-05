@@ -19,6 +19,9 @@ class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_active = Column(Boolean, nullable=False, default=True)
 
     # Relationships
-    users = relationship("User", back_populates="organization", cascade="all, delete-orphan", lazy="selectin")
-    members = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
-    roles = relationship("Role", back_populates="organization", cascade="all, delete-orphan")
+    users = relationship("User", back_populates="organization",
+                         cascade="all, delete-orphan", lazy="selectin")
+    members = relationship(
+        "OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
+    roles = relationship("Role", back_populates="organization",
+                         cascade="all, delete-orphan")

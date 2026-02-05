@@ -6,19 +6,17 @@ This script:
 3. Assigns admin user as organization owner with super_admin role
 """
 
+from app.models.role import Role, Permission, OrganizationUser
+from app.models.user import User
+from app.models.organization import Organization
+from app.database import SessionLocal
+from sqlalchemy.orm import Session
 import sys
 from pathlib import Path
 import uuid
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from sqlalchemy.orm import Session
-
-from app.database import SessionLocal
-from app.models.organization import Organization
-from app.models.user import User
-from app.models.role import Role, Permission, OrganizationUser
 
 
 # System role definitions with their permissions
@@ -78,25 +76,25 @@ SYSTEM_ROLES = {
 def create_organization_roles(db: Session, organization_id: str):
     """Create system roles for an organization."""
     print("\nCreating system roles...")
-    
+
     # Get all permissions
     all_permissions = db.query(Permission).all()
     permissions_map = {p.name: p for p in all_permissions}
-    
+
     roles_created = {}
-    
+
     for role_name, role_config in SYSTEM_ROLES.items():
         # Check if role already exists
         existing_role = db.query(Role).filter(
             Role.organization_id == organization_id,
             Role.name == role_name
         ).first()
-        
+
         if existing_role:
             print(f"  ✓ Role '{role_name}' already exists")
             roles_created[role_name] = existing_role
             continue
-        
+
         # Create role
         role = Role(
             id=str(uuid.uuid4()),
@@ -108,7 +106,7 @@ def create_organization_roles(db: Session, organization_id: str):
             is_system=True,  # System roles cannot be deleted
             is_active=True
         )
-        
+
         # Assign permissions
         if role_config["permissions"] == "all":
             role.permissions = all_permissions
@@ -118,14 +116,15 @@ def create_organization_roles(db: Session, organization_id: str):
                 for perm_name in role_config["permissions"]
                 if perm_name in permissions_map
             ]
-        
+
         db.add(role)
         roles_created[role_name] = role
-        print(f"  + Created role: {role_name} with {len(role.permissions)} permissions")
-    
+        print(
+            f"  + Created role: {role_name} with {len(role.permissions)} permissions")
+
     db.commit()
     print(f"\n✅ Created {len(roles_created)} system roles\n")
-    
+
     return roles_created
 
 
@@ -135,9 +134,9 @@ def main():
     print("JICF Organization Setup with RBAC")
     print("=" * 70)
     print()
-    
+
     db = SessionLocal()
-    
+
     try:
         # Step 1: Create JICF organization
         print("Step 1: Creating JICF organization...")
@@ -178,13 +177,13 @@ def main():
             if not admin_user.organization_id:
                 admin_user.organization_id = jicf_org.id
                 print(f"  + Assigned user to JICF organization")
-            
+
             # Create organization membership with super_admin role
             existing_membership = db.query(OrganizationUser).filter(
                 OrganizationUser.user_id == admin_user.id,
                 OrganizationUser.organization_id == jicf_org.id
             ).first()
-            
+
             if not existing_membership:
                 org_user = OrganizationUser(
                     id=str(uuid.uuid4()),
@@ -202,7 +201,7 @@ def main():
                 existing_membership.role_id = roles["super_admin"].id
                 existing_membership.is_owner = True
                 print(f"  ✓ Updated existing membership to super_admin role")
-            
+
             db.commit()
             print(f"  ✅ admin@jinanicf.com is now JICF super admin")
         else:
@@ -219,7 +218,8 @@ def main():
         print()
         print(f"System Roles Created: {len(roles)}")
         for role_name, role in roles.items():
-            print(f"  - {role.display_name} ({role_name}): {len(role.permissions)} permissions")
+            print(
+                f"  - {role.display_name} ({role_name}): {len(role.permissions)} permissions")
         print()
         print("Next steps:")
         print("1. Run migrations: alembic upgrade head")

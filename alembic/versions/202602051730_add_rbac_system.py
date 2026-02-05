@@ -26,8 +26,10 @@ def upgrade() -> None:
         sa.Column('description', sa.String(length=500), nullable=True),
         sa.Column('category', sa.String(length=50), nullable=False),
         sa.Column('is_system', sa.Boolean(), nullable=True, default=False),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text(
+            'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('name')
     )
@@ -42,20 +44,26 @@ def upgrade() -> None:
         sa.Column('description', sa.String(length=500), nullable=True),
         sa.Column('is_system', sa.Boolean(), nullable=True, default=False),
         sa.Column('is_active', sa.Boolean(), nullable=True, default=True),
-        sa.Column('color', sa.String(length=7), nullable=True, default='#6B7280'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
+        sa.Column('color', sa.String(length=7),
+                  nullable=True, default='#6B7280'),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text(
+            'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.ForeignKeyConstraint(['organization_id'], [
+                                'organizations.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_roles_organization_id'), 'roles', ['organization_id'], unique=False)
+    op.create_index(op.f('ix_roles_organization_id'), 'roles',
+                    ['organization_id'], unique=False)
 
     # Create role_permissions association table
     op.create_table(
         'role_permissions',
         sa.Column('role_id', sa.String(length=36), nullable=False),
         sa.Column('permission_id', sa.String(length=36), nullable=False),
-        sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(
+            ['permission_id'], ['permissions.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('role_id', 'permission_id')
     )
@@ -71,17 +79,24 @@ def upgrade() -> None:
         sa.Column('is_active', sa.Boolean(), nullable=True, default=True),
         sa.Column('invited_by', sa.String(length=36), nullable=True),
         sa.Column('joined_at', sa.String(length=50), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text(
+            'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
         sa.ForeignKeyConstraint(['invited_by'], ['users.id']),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='SET NULL'),
+        sa.ForeignKeyConstraint(['organization_id'], [
+                                'organizations.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(
+            ['role_id'], ['roles.id'], ondelete='SET NULL'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_organization_users_organization_id'), 'organization_users', ['organization_id'], unique=False)
-    op.create_index(op.f('ix_organization_users_role_id'), 'organization_users', ['role_id'], unique=False)
-    op.create_index(op.f('ix_organization_users_user_id'), 'organization_users', ['user_id'], unique=False)
+    op.create_index(op.f('ix_organization_users_organization_id'),
+                    'organization_users', ['organization_id'], unique=False)
+    op.create_index(op.f('ix_organization_users_role_id'),
+                    'organization_users', ['role_id'], unique=False)
+    op.create_index(op.f('ix_organization_users_user_id'),
+                    'organization_users', ['user_id'], unique=False)
 
     # Create user_invitations table
     op.create_table(
@@ -96,25 +111,36 @@ def upgrade() -> None:
         sa.Column('accepted_at', sa.String(length=50), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True, default=True),
         sa.Column('message', sa.String(length=1000), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                  server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text(
+            'CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
         sa.ForeignKeyConstraint(['invited_by'], ['users.id']),
-        sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='SET NULL'),
+        sa.ForeignKeyConstraint(['organization_id'], [
+                                'organizations.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(
+            ['role_id'], ['roles.id'], ondelete='SET NULL'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('token')
     )
-    op.create_index(op.f('ix_user_invitations_email'), 'user_invitations', ['email'], unique=False)
-    op.create_index(op.f('ix_user_invitations_organization_id'), 'user_invitations', ['organization_id'], unique=False)
+    op.create_index(op.f('ix_user_invitations_email'),
+                    'user_invitations', ['email'], unique=False)
+    op.create_index(op.f('ix_user_invitations_organization_id'),
+                    'user_invitations', ['organization_id'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_user_invitations_organization_id'), table_name='user_invitations')
-    op.drop_index(op.f('ix_user_invitations_email'), table_name='user_invitations')
+    op.drop_index(op.f('ix_user_invitations_organization_id'),
+                  table_name='user_invitations')
+    op.drop_index(op.f('ix_user_invitations_email'),
+                  table_name='user_invitations')
     op.drop_table('user_invitations')
-    op.drop_index(op.f('ix_organization_users_user_id'), table_name='organization_users')
-    op.drop_index(op.f('ix_organization_users_role_id'), table_name='organization_users')
-    op.drop_index(op.f('ix_organization_users_organization_id'), table_name='organization_users')
+    op.drop_index(op.f('ix_organization_users_user_id'),
+                  table_name='organization_users')
+    op.drop_index(op.f('ix_organization_users_role_id'),
+                  table_name='organization_users')
+    op.drop_index(op.f('ix_organization_users_organization_id'),
+                  table_name='organization_users')
     op.drop_table('organization_users')
     op.drop_table('role_permissions')
     op.drop_index(op.f('ix_roles_organization_id'), table_name='roles')

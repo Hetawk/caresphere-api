@@ -4,17 +4,16 @@ This script should be run after the RBAC migration to populate
 default permissions and create system roles for organizations.
 """
 
+import uuid
+from app.models.role import Permission
+from app.database import SessionLocal
+from sqlalchemy.orm import Session
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy.orm import Session
-
-from app.database import SessionLocal
-from app.models.role import Permission
-import uuid
 
 # Default permissions grouped by category
 DEFAULT_PERMISSIONS = {
@@ -27,20 +26,25 @@ DEFAULT_PERMISSIONS = {
     "messages": [
         ("view_messages", "View Messages", "View message history"),
         ("send_messages", "Send Messages", "Send messages to members"),
-        ("manage_templates", "Manage Templates", "Create and edit message templates"),
+        ("manage_templates", "Manage Templates",
+         "Create and edit message templates"),
         ("delete_messages", "Delete Messages", "Delete message records"),
     ],
     "automation": [
         ("view_automation", "View Automation", "View automation rules and logs"),
-        ("manage_automation", "Manage Automation", "Create and edit automation rules"),
-        ("execute_automation", "Execute Automation", "Manually trigger automation rules"),
+        ("manage_automation", "Manage Automation",
+         "Create and edit automation rules"),
+        ("execute_automation", "Execute Automation",
+         "Manually trigger automation rules"),
     ],
     "analytics": [
-        ("view_analytics", "View Analytics", "View analytics dashboards and reports"),
+        ("view_analytics", "View Analytics",
+         "View analytics dashboards and reports"),
         ("export_reports", "Export Reports", "Export analytics reports"),
     ],
     "organization": [
-        ("manage_organization", "Manage Organization", "Update organization settings"),
+        ("manage_organization", "Manage Organization",
+         "Update organization settings"),
         ("invite_users", "Invite Users", "Invite new users to the organization"),
         ("manage_users", "Manage Users", "View and manage organization users"),
         ("remove_users", "Remove Users", "Remove users from the organization"),
@@ -53,7 +57,8 @@ DEFAULT_PERMISSIONS = {
     "settings": [
         ("view_settings", "View Settings", "View organization settings"),
         ("manage_settings", "Manage Settings", "Update organization settings"),
-        ("manage_integrations", "Manage Integrations", "Configure external integrations"),
+        ("manage_integrations", "Manage Integrations",
+         "Configure external integrations"),
     ],
 }
 
@@ -114,18 +119,19 @@ SYSTEM_ROLES = {
 def seed_permissions(db: Session):
     """Create all default permissions."""
     print("Seeding default permissions...")
-    
+
     permissions_map = {}
-    
+
     for category, perms in DEFAULT_PERMISSIONS.items():
         for name, display_name, description in perms:
             # Check if permission already exists
-            existing = db.query(Permission).filter(Permission.name == name).first()
+            existing = db.query(Permission).filter(
+                Permission.name == name).first()
             if existing:
                 print(f"  ✓ Permission '{name}' already exists")
                 permissions_map[name] = existing
                 continue
-            
+
             permission = Permission(
                 id=str(uuid.uuid4()),
                 name=name,
@@ -137,10 +143,10 @@ def seed_permissions(db: Session):
             db.add(permission)
             permissions_map[name] = permission
             print(f"  + Created permission: {name}")
-    
+
     db.commit()
     print(f"\n✅ Seeded {len(permissions_map)} permissions\n")
-    
+
     return permissions_map
 
 
@@ -150,13 +156,13 @@ def main():
     print("RBAC System Seed Script")
     print("=" * 60)
     print()
-    
+
     db = SessionLocal()
-    
+
     try:
         # Seed permissions
         permissions_map = seed_permissions(db)
-        
+
         print("\n" + "=" * 60)
         print("✅ RBAC seeding complete!")
         print("=" * 60)
@@ -166,7 +172,7 @@ def main():
         print("2. Create system roles for JICF organization")
         print("3. Assign super_admin role to admin@jinanicf.com")
         print()
-        
+
     except Exception as e:
         print(f"\n❌ Error: {e}")
         db.rollback()
