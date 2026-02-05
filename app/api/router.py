@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter
 
-from app.api import analytics, auth, automation, fields, members, messages, settings, templates, monitoring
+from app.api import analytics, auth, automation, fields, members, messages, settings, templates, monitoring, dashboard
 
 api_router = APIRouter()
+
+# Dashboard (no prefix - directly at /dashboard)
+api_router.include_router(dashboard.router)
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(members.router, prefix="/members", tags=["Members"])
