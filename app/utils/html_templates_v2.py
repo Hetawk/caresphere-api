@@ -264,6 +264,8 @@ def get_dashboard_html() -> str:
                 z-index: 2000;
                 animation: slideIn 0.3s ease-out;
                 display: none;
+                max-width: 400px;
+                word-wrap: break-word;
             }}
             .toast.success {{ background: #28a745; }}
             .toast.error {{ background: #dc3545; }}
@@ -313,12 +315,25 @@ def get_dashboard_html() -> str:
             <main class="main-content">
                 <div class="header">
                     <h2>API Dashboard</h2>
-                    <p>
-                        <span class="status-badge">✓ ONLINE</span>
-                        <span style="margin-left: 15px; color: #6c757d;">
-                            Version 1.0.0 • {current_time}
-                        </span>
-                    </p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <p style="margin: 0;">
+                            <span class="status-badge">✓ ONLINE</span>
+                            <span style="margin-left: 15px; color: #6c757d;">
+                                Version 1.0.0 • {current_time}
+                            </span>
+                        </p>
+                        <div id="auth-controls">
+                            <div id="login-section" style="display: flex; gap: 10px;">
+                                <input type="email" id="login-email" placeholder="Email" style="padding: 8px; border-radius: 6px; border: 1px solid #E8C589;">
+                                <input type="password" id="login-password" placeholder="Password" style="padding: 8px; border-radius: 6px; border: 1px solid #E8C589;">
+                                <button class="btn btn-primary" onclick="login()" style="padding: 8px 16px;">Login</button>
+                            </div>
+                            <div id="logged-in-section" style="display: none;">
+                                <span id="user-email" style="color: #6c757d; margin-right: 10px;"></span>
+                                <button class="btn btn-secondary" onclick="logout()" style="padding: 8px 16px;">Logout</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- User Management Section -->
@@ -439,11 +454,74 @@ def get_dashboard_html() -> str:
         <script>
             let users = [];
             let editingUserId = null;
+            let currentUserEmail = null;
             
             // Load users on page load
             window.onload = function() {{
+                checkAuth();
                 loadUsers();
             }};
+            
+            function checkAuth() {{
+                const token = localStorage.getItem('token');
+                const userEmail = localStorage.getItem('userEmail');
+                
+                if (token && userEmail) {{
+                    currentUserEmail = userEmail;
+                    document.getElementById('login-section').style.display = 'none';
+                    document.getElementById('logged-in-section').style.display = 'block';
+                    document.getElementById('user-email').textContent = userEmail;
+                }} else {{
+                    document.getElementById('login-section').style.display = 'flex';
+                    document.getElementById('logged-in-section').style.display = 'none';
+                }}
+            }}
+            
+            async function login() {{
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {{
+                    showToast('Please enter email and password', 'error');
+                    return;
+                }}
+                
+                try {{
+                    const response = await fetch('/auth/login', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify({{ email, password }})
+                    }});
+                    
+                    if (response.ok) {{
+                        const result = await response.json();
+                        const data = result.data;
+                        localStorage.setItem('token', data.accessToken);
+                        localStorage.setItem('userEmail', data.user.email);
+                        currentUserEmail = data.user.email;
+                        
+                        showToast('Login successful!', 'success');
+                        checkAuth();
+                        loadUsers();
+                    }} else {{
+                        const error = await response.json();
+                        showToast(`Login failed: ${{error.detail || error.message || 'Invalid credentials'}}`, 'error');
+                    }}
+                }} catch (error) {{
+                    console.error('Login error:', error);
+                    showToast('Login failed: ' + error.message, 'error');
+                }}
+            }}
+            
+            function logout() {{
+                localStorage.removeItem('token');
+                localStorage.removeItem('userEmail');
+                currentUserEmail = null;
+                checkAuth();
+                showToast('Logged out successfully', 'success');
+            }}
             
             function showSection(sectionName) {{
                 // Update nav links
@@ -606,30 +684,53 @@ def get_dashboard_html() -> str:
                     formData.emailVerified = document.getElementById('emailVerified').checked;
                 }}
                 
+                console.log('Saving user with data:', formData);
+                console.log('URL:', editingUserId ? `/admin/users/${{editingUserId}}` : '/auth/register');
+                
                 try {{
                     const url = editingUserId ? `/admin/users/${{editingUserId}}` : '/auth/register';
                     const method = editingUserId ? 'PATCH' : 'POST';
                     
+                    const headers = {{
+                        'Content-Type': 'application/json'
+                    }};
+                    
+                    // Add auth token only for update operations
+                    if (editingUserId) {{
+                        const token = localStorage.getItem('token') || '';
+                        if (token) {{
+                            headers['Authorization'] = `Bearer ${{token}}`;
+                        }}
+                        console.log('Using token:', token ? 'Yes' : 'No');
+                    }}
+                    
                     const response = await fetch(url, {{
                         method,
-                        headers: {{
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${{localStorage.getItem('token') || ''}}`
-                        }},
+                        headers,
                         body: JSON.stringify(formData)
                     }});
+                    
+                    console.log('Response status:', response.status);
                     
                     if (response.ok) {{
                         showToast(editingUserId ? 'User updated successfully!' : 'User created successfully!', 'success');
                         closeModal();
                         setTimeout(() => loadUsers(), 500);
                     }} else {{
-                        const error = await response.json();
-                        showToast(error.message || 'Failed to save user', 'error');
+                        const errorText = await response.text();
+                        console.error('Error response:', errorText);
+                        let errorMsg;
+                        try {{
+                            const error = JSON.parse(errorText);
+                            errorMsg = error.detail || error.message || JSON.stringify(error);
+                        }} catch {{
+                            errorMsg = errorText || 'Unknown error';
+                        }}
+                        showToast(`Failed to save user: ${{errorMsg}}`, 'error');
                     }}
                 }} catch (error) {{
                     console.error('Error saving user:', error);
-                    showToast('Failed to save user', 'error');
+                    showToast(`Failed to save user: ${{error.message}}`, 'error');
                 }}
             }}
             
@@ -696,7 +797,7 @@ def get_dashboard_html() -> str:
                 
                 setTimeout(() => {{
                     toast.classList.remove('active');
-                }}, 3000);
+                }}, 5000);  // Show for 5 seconds to read error messages
             }}
         </script>
     </body>
