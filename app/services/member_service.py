@@ -20,8 +20,13 @@ def list_members(
     limit: int,
     status_filter: MemberStatus | None = None,
     search: str | None = None,
+    organization_id: str | None = None,
 ) -> Tuple[List[Member], int]:
     query = db.query(Member)
+
+    # Filter by organization if provided
+    if organization_id:
+        query = query.filter(Member.organization_id == organization_id)
 
     if status_filter:
         query = query.filter(Member.member_status == status_filter)
@@ -55,7 +60,12 @@ def get_member(db: Session, member_id: str) -> Member:
 
 def create_member(db: Session, payload: MemberCreate, *, current_user: User) -> Member:
     data = payload.model_dump(by_alias=True)
-    member = Member(**data, created_by=current_user.id)
+    # Automatically assign member to current user's organization
+    member = Member(
+        **data,
+        created_by=current_user.id,
+        organization_id=current_user.organization_id
+    )
     db.add(member)
     db.commit()
     db.refresh(member)
@@ -79,8 +89,13 @@ def delete_member(db: Session, member_id: str) -> None:
     db.commit()
 
 
-def search_members(db: Session, payload: MemberSearchPayload) -> Tuple[List[Member], int]:
+def search_members(db: Session, payload: MemberSearchPayload, organization_id: str | None = None) -> Tuple[List[Member], int]:
     query = db.query(Member)
+
+    # Filter by organization if provided
+    if organization_id:
+        query = query.filter(Member.organization_id == organization_id)
+
     filters = payload.filters or {}
 
     status_values = filters.get("status")

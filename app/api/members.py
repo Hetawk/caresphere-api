@@ -34,11 +34,12 @@ MANAGER_ROLES = (
 @router.get("/")
 async def list_members(
     page: int = Query(settings.PAGE_DEF, ge=1),
-    limit: int = Query(settings.PAGE_SIZE_DEF, ge=1, le=settings.PAGE_SIZE_MAX),
+    limit: int = Query(settings.PAGE_SIZE_DEF, ge=1,
+                       le=settings.PAGE_SIZE_MAX),
     status_filter: str | None = Query(None, alias="status"),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(deps.require_roles(*MANAGER_ROLES)),
+    current_user: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
     try:
         status_enum = MemberStatus(status_filter) if status_filter else None
@@ -50,8 +51,10 @@ async def list_members(
         limit=limit,
         status_filter=status_enum,
         search=search,
+        organization_id=current_user.organization_id,  # Filter by user's organization
     )
-    pagination_meta = pagination.paginate_metadata(total=total, page=page, limit=limit)
+    pagination_meta = pagination.paginate_metadata(
+        total=total, page=page, limit=limit)
     payload = {
         "members": [MemberPublic.model_validate(item).model_dump(by_alias=True) for item in items],
         "pagination": pagination_meta,
@@ -65,7 +68,8 @@ async def create_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
-    member = member_service.create_member(db, payload, current_user=current_user)
+    member = member_service.create_member(
+        db, payload, current_user=current_user)
     body = MemberPublic.model_validate(member).model_dump(by_alias=True)
     return responses.success_response(body, status_code=status.HTTP_201_CREATED)
 
@@ -91,7 +95,8 @@ async def update_member(
 async def delete_member(
     member_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(deps.require_roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+    _: User = Depends(deps.require_roles(
+        UserRole.ADMIN, UserRole.SUPER_ADMIN)),
 ):
     member_service.delete_member(db, member_id)
     return responses.success_response({"message": "Member deleted successfully"})
@@ -104,7 +109,8 @@ async def search_members(
     _: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
     items, total = member_service.search_members(db, payload)
-    pagination_meta = pagination.paginate_metadata(total=total, page=payload.page, limit=payload.limit)
+    pagination_meta = pagination.paginate_metadata(
+        total=total, page=payload.page, limit=payload.limit)
     data = {
         "members": [MemberPublic.model_validate(item).model_dump(by_alias=True) for item in items],
         "pagination": pagination_meta,
@@ -119,7 +125,8 @@ async def list_member_notes(
     _: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
     notes = member_service.list_notes(db, member_id)
-    data = [MemberNotePublic.model_validate(note).model_dump(by_alias=True) for note in notes]
+    data = [MemberNotePublic.model_validate(
+        note).model_dump(by_alias=True) for note in notes]
     return responses.success_response({"notes": data})
 
 
@@ -130,7 +137,8 @@ async def add_member_note(
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
-    note = member_service.add_note(db, member_id, payload, current_user=current_user)
+    note = member_service.add_note(
+        db, member_id, payload, current_user=current_user)
     body = MemberNotePublic.model_validate(note).model_dump(by_alias=True)
     return responses.success_response(body, status_code=status.HTTP_201_CREATED)
 
@@ -142,5 +150,6 @@ async def list_member_activities(
     _: User = Depends(deps.require_roles(*MANAGER_ROLES)),
 ):
     activities = member_service.list_activities(db, member_id)
-    data = [MemberActivityPublic.model_validate(item).model_dump(by_alias=True) for item in activities]
+    data = [MemberActivityPublic.model_validate(
+        item).model_dump(by_alias=True) for item in activities]
     return responses.success_response({"activities": data})

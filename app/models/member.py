@@ -28,6 +28,8 @@ class MemberStatus(str, enum.Enum):
 class Member(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "members"
 
+    organization_id = Column(String(36), ForeignKey(
+        "organizations.id"), nullable=True, index=True)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
