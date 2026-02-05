@@ -29,8 +29,11 @@ class UpdateUserRequest(BaseModel):
     email: EmailStr | None = None
     fullName: str | None = None
     displayName: str | None = None
+    avatarUrl: str | None = None
     role: UserRole | None = None
     status: UserStatus | None = None
+    emailVerified: bool | None = None
+    password: str | None = None  # New password if changing
 
 
 class UserRoleResponse(BaseModel):
@@ -92,10 +95,18 @@ async def update_user(
         target_user.full_name = payload.fullName
     if payload.displayName is not None:
         target_user.display_name = payload.displayName
+    if payload.avatarUrl is not None:
+        target_user.avatar_url = payload.avatarUrl
     if payload.role is not None:
         target_user.role = payload.role
     if payload.status is not None:
         target_user.status = payload.status
+    if payload.emailVerified is not None:
+        target_user.email_verified = payload.emailVerified
+    if payload.password is not None:
+        # Hash the new password
+        from app.utils.security import hash_password
+        target_user.password_hash = hash_password(payload.password)
 
     db.commit()
     db.refresh(target_user)

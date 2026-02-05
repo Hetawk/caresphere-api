@@ -337,6 +337,7 @@ def get_dashboard_html() -> str:
                                     <th>Full Name</th>
                                     <th>Role</th>
                                     <th>Status</th>
+                                    <th>Verified</th>
                                     <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
@@ -386,6 +387,17 @@ def get_dashboard_html() -> str:
                     </div>
                     
                     <div class="form-group">
+                        <label for="avatarUrl">Avatar URL</label>
+                        <input type="url" id="avatarUrl" placeholder="https://...">
+                    </div>
+                    
+                    <div class="form-group" id="password-change-group">
+                        <label for="newPassword">New Password (leave blank to keep current)</label>
+                        <input type="password" id="newPassword" minlength="8">
+                        <small style="color: #6c757d; font-size: 0.85em;">Minimum 8 characters</small>
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="role">Role *</label>
                         <select id="role" required>
                             <option value="super_admin">Super Admin</option>
@@ -403,6 +415,14 @@ def get_dashboard_html() -> str:
                             <option value="inactive">Inactive</option>
                             <option value="suspended">Suspended</option>
                         </select>
+                    </div>
+                    
+                    <div class="form-group" id="email-verified-group" style="display: none;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="emailVerified" style="width: auto; margin-right: 10px;">
+                            <span>Email Verified</span>
+                        </label>
+                        <small style="color: #6c757d; font-size: 0.85em;">Check if user's email is verified</small>
                     </div>
                     
                     <div class="action-buttons">
@@ -494,15 +514,19 @@ def get_dashboard_html() -> str:
                 
                 users.forEach(user => {{
                     const row = document.createElement('tr');
+                    const verifiedIcon = user.emailVerified || user.email_verified ? '✓' : '✗';
+                    const verifiedColor = user.emailVerified || user.email_verified ? '#28a745' : '#dc3545';
                     row.innerHTML = `
                         <td>${{user.email}}</td>
                         <td>${{user.fullName || user.full_name || 'N/A'}}</td>
                         <td><span class="role-badge role-${{user.role}}">${{formatRole(user.role)}}</span></td>
                         <td><span class="status-badge-inline status-${{user.status}}">${{user.status}}</span></td>
+                        <td><span style="color: ${{verifiedColor}}; font-weight: bold;">${{verifiedIcon}}</span></td>
                         <td>${{formatDate(user.createdAt || user.created_at)}}</td>
                         <td>
-                            <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.85em; margin-right: 5px;" onclick="editUser('${{user.id}}')">Edit</button>
-                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" onclick="deleteUser('${{user.id}}', '${{user.email}}')">Delete</button>
+                            <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.85em; margin-right: 5px;" onclick="editUser('${{user.id}}')">✏️ Edit</button>
+                            <button class="btn btn-primary" style="padding: 5px 10px; font-size: 0.85em; margin-right: 5px;" onclick="resetPassword('${{user.id}}', '${{user.email}}')">🔑 Reset PWD</button>
+                            <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.85em;" onclick="deleteUser('${{user.id}}', '${{user.email}}')">🗑️ Delete</button>
                         </td>
                     `;
                     tbody.appendChild(row);
@@ -526,6 +550,8 @@ def get_dashboard_html() -> str:
                 document.getElementById('user-id').value = '';
                 document.getElementById('password-group').style.display = 'block';
                 document.getElementById('password').required = true;
+                document.getElementById('password-change-group').style.display = 'none';
+                document.getElementById('email-verified-group').style.display = 'none';
                 document.getElementById('user-modal').classList.add('active');
             }}
             
@@ -539,10 +565,14 @@ def get_dashboard_html() -> str:
                 document.getElementById('email').value = user.email;
                 document.getElementById('fullName').value = user.fullName || user.full_name || '';
                 document.getElementById('displayName').value = user.displayName || user.display_name || '';
+                document.getElementById('avatarUrl').value = user.avatarUrl || user.avatar_url || '';
                 document.getElementById('role').value = user.role;
                 document.getElementById('status').value = user.status;
+                document.getElementById('emailVerified').checked = user.emailVerified || user.email_verified || false;
                 document.getElementById('password-group').style.display = 'none';
                 document.getElementById('password').required = false;
+                document.getElementById('password-change-group').style.display = 'block';
+                document.getElementById('email-verified-group').style.display = 'block';
                 
                 document.getElementById('user-modal').classList.add('active');
             }}
@@ -560,12 +590,20 @@ def get_dashboard_html() -> str:
                     email: document.getElementById('email').value,
                     fullName: document.getElementById('fullName').value,
                     displayName: document.getElementById('displayName').value || null,
+                    avatarUrl: document.getElementById('avatarUrl').value || null,
                     role: document.getElementById('role').value,
                     status: document.getElementById('status').value
                 }};
                 
                 if (!editingUserId) {{
                     formData.password = document.getElementById('password').value;
+                }} else {{
+                    // Include password only if changed
+                    const newPassword = document.getElementById('newPassword').value;
+                    if (newPassword) {{
+                        formData.password = newPassword;
+                    }}
+                    formData.emailVerified = document.getElementById('emailVerified').checked;
                 }}
                 
                 try {{
@@ -592,6 +630,37 @@ def get_dashboard_html() -> str:
                 }} catch (error) {{
                     console.error('Error saving user:', error);
                     showToast('Failed to save user', 'error');
+                }}
+            }}
+            
+            async function resetPassword(userId, userEmail) {{
+                const newPassword = prompt(`Enter new password for ${{userEmail}}:\\n(Minimum 8 characters)`);
+                
+                if (!newPassword) return;
+                
+                if (newPassword.length < 8) {{
+                    showToast('Password must be at least 8 characters', 'error');
+                    return;
+                }}
+                
+                try {{
+                    const response = await fetch(`/admin/users/${{userId}}`, {{
+                        method: 'PATCH',
+                        headers: {{
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${{localStorage.getItem('token') || ''}}`
+                        }},
+                        body: JSON.stringify({{ password: newPassword }})
+                    }});
+                    
+                    if (response.ok) {{
+                        showToast('Password reset successfully!', 'success');
+                    }} else {{
+                        showToast('Failed to reset password', 'error');
+                    }}
+                }} catch (error) {{
+                    console.error('Error resetting password:', error);
+                    showToast('Failed to reset password', 'error');
                 }}
             }}
             
