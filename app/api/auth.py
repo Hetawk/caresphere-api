@@ -47,6 +47,7 @@ async def send_verification_code(payload: SendVerificationCodeRequest, db: Sessi
     This must be called before registration.
     """
     from app.services.email_service import EmailConfigError, EmailSendError
+    from app.utils.exceptions import ConflictError, ValidationError
 
     try:
         # Validate email format
@@ -79,6 +80,12 @@ async def send_verification_code(payload: SendVerificationCodeRequest, db: Sessi
 
     except AuthenticationError:
         raise
+    except ConflictError as e:
+        logger.error(f"[VERIFICATION] ❌ Conflict error: {str(e)}")
+        raise AuthenticationError(str(e))
+    except ValidationError as e:
+        logger.error(f"[VERIFICATION] ❌ Validation error: {str(e)}")
+        raise AuthenticationError(str(e))
     except EmailConfigError as e:
         logger.error(f"[VERIFICATION] ❌ Email configuration error: {str(e)}")
         raise AuthenticationError(
