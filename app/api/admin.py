@@ -5,12 +5,17 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api import deps
 from app.database import get_db
 from app.models.user import User, UserRole, UserStatus
-from app.schemas.user import UserPublic
+from app.schemas.user import (
+    UserPublic,
+    UserOrganizationMembership,
+    UserOrganizationInfo,
+    UserOrganizationRole
+)
 from app.utils import responses
 
 logger = logging.getLogger(__name__)
@@ -58,8 +63,46 @@ async def list_users(
     List all users in the system.
     Requires authentication.
     """
-    users = db.query(User).order_by(User.created_at.desc()).all()
-    user_publics = [UserPublic.model_validate(user) for user in users]
+    # Eager load organization memberships with related data
+    users = db.query(User).options(
+        joinedload(User.organization_memberships).joinedload("organization"),
+        joinedload(User.organization_memberships).joinedload("role")
+    ).order_by(User.created_at.desc()).all()
+
+    # Build user public objects with organization data
+    user_publics = []
+    for user in users:
+        user_public = UserPublic.model_validate(user)
+
+        # Add organization memberships
+        org_memberships = []
+        for membership in user.organization_memberships:
+            org_info = UserOrganizationInfo(
+                id=membership.organization.id,
+                name=membership.organization.name,
+                slug=membership.organization.slug,
+                is_active=membership.organization.is_active
+            )
+
+            role_info = None
+            if membership.role:
+                role_info = UserOrganizationRole(
+                    id=membership.role.id,
+                    name=membership.role.name,
+                    display_name=membership.role.display_name
+                )
+
+            org_membership = UserOrganizationMembership(
+                organization=org_info,
+                role=role_info,
+                is_owner=membership.is_owner,
+                is_active=membership.is_active,
+                joined_at=membership.joined_at
+            )
+            org_memberships.append(org_membership)
+
+        user_public.organizations = org_memberships
+        user_publics.append(user_public)
 
     response = UsersListResponse(
         users=user_publics,

@@ -95,6 +95,40 @@ def get_permissions_for_role(role: UserRole) -> UserPermissions:
         )
 
 
+class UserOrganizationRole(BaseModel):
+    """Role information within an organization."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    displayName: str = Field(alias="display_name")
+
+    @field_serializer('displayName')
+    def serialize_display_name(self, value: str) -> str:
+        return value
+
+
+class UserOrganizationInfo(BaseModel):
+    """Basic organization info for user display."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    slug: str
+    isActive: bool = Field(alias="is_active")
+
+
+class UserOrganizationMembership(BaseModel):
+    """User's membership in an organization with role."""
+    model_config = ConfigDict(from_attributes=True)
+
+    organization: UserOrganizationInfo
+    role: Optional[UserOrganizationRole] = None
+    isOwner: bool = Field(alias="is_owner")
+    isActive: bool = Field(alias="is_active")
+    joinedAt: Optional[str] = Field(default=None, alias="joined_at")
+
+
 class UserBase(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -119,6 +153,8 @@ class UserPublic(UserBase):
     updatedAt: datetime = Field(alias="updated_at")
     permissions: UserPermissions = Field(
         default_factory=lambda: UserPermissions())
+    organizations: list[UserOrganizationMembership] = Field(
+        default_factory=list)
 
     @field_serializer('createdAt', 'updatedAt')
     def serialize_datetime(self, value: datetime) -> str:
