@@ -46,6 +46,8 @@ async def send_verification_code(payload: SendVerificationCodeRequest, db: Sessi
     Send a 6-digit verification code to the email address for registration.
     This must be called before registration.
     """
+    from app.services.email_service import EmailConfigError, EmailSendError
+
     try:
         # Validate email format
         if not payload.email or '@' not in payload.email or '.' not in payload.email:
@@ -77,9 +79,16 @@ async def send_verification_code(payload: SendVerificationCodeRequest, db: Sessi
 
     except AuthenticationError:
         raise
+    except EmailConfigError as e:
+        logger.error(f"[VERIFICATION] ❌ Email configuration error: {str(e)}")
+        raise AuthenticationError(
+            "Email service is not configured. Please contact support.")
+    except EmailSendError as e:
+        logger.error(f"[VERIFICATION] ❌ Email send error: {str(e)}")
+        raise AuthenticationError(f"Failed to send email: {str(e)}")
     except Exception as e:
         logger.error(
-            f"[VERIFICATION] ❌ Failed to send verification code: {type(e).__name__}: {str(e)}")
+            f"[VERIFICATION] ❌ Unexpected error: {type(e).__name__}: {str(e)}")
         raise AuthenticationError(
             "Failed to send verification code. Please try again.")
 
