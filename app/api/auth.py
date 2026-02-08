@@ -47,24 +47,39 @@ async def send_verification_code(payload: SendVerificationCodeRequest, db: Sessi
     This must be called before registration.
     """
     try:
+        # Validate email format
+        if not payload.email or '@' not in payload.email or '.' not in payload.email:
+            logger.error(
+                f"[VERIFICATION] ❌ Invalid email format: {payload.email}")
+            raise AuthenticationError("Please enter a valid email address")
+
+        logger.info(f"[VERIFICATION] Generating code for: {payload.email}")
+
         # Generate code
         code = auth_service.generate_registration_verification_code(
             db, payload.email)
 
-        # Send verification email
+        logger.info(f"[VERIFICATION] Sending email to: {payload.email}")
+
+        # Send verification email (use email as user_name since we don't have their name yet)
         await send_verification_code_email(
             to=payload.email,
+            user_name=payload.email.split('@')[0],
             verification_code=code
         )
-        logger.info(f"Verification code sent to {payload.email}")
+        logger.info(
+            f"[VERIFICATION] ✅ Verification code sent to {payload.email}")
 
         return responses.success_response(
             {"message": "Verification code sent to your email"},
             status_code=status.HTTP_200_OK
         )
 
+    except AuthenticationError:
+        raise
     except Exception as e:
-        logger.error(f"Failed to send verification code: {e}")
+        logger.error(
+            f"[VERIFICATION] ❌ Failed to send verification code: {type(e).__name__}: {str(e)}")
         raise AuthenticationError(
             "Failed to send verification code. Please try again.")
 
