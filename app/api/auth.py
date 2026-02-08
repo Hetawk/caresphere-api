@@ -16,6 +16,7 @@ from app.schemas.user import (
     MessageResponse,
     RefreshRequest,
     RefreshResponse,
+    RegisterWithOrganizationRequest,
     ResetPasswordRequest,
     UserCreate,
     UserLogin,
@@ -36,6 +37,35 @@ from app.utils.exceptions import AuthenticationError
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.post("/send-verification-code", status_code=status.HTTP_200_OK)
+async def send_verification_code(payload: SendVerificationCodeRequest, db: Session = Depends(get_db)):
+    """
+    Send a 6-digit verification code to the email address for registration.
+    This must be called before registration.
+    """
+    try:
+        # Generate code
+        code = auth_service.generate_registration_verification_code(
+            db, payload.email)
+
+        # Send verification email
+        await send_verification_code_email(
+            to=payload.email,
+            verification_code=code
+        )
+        logger.info(f"Verification code sent to {payload.email}")
+
+        return responses.success_response(
+            {"message": "Verification code sent to your email"},
+            status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to send verification code: {e}")
+        raise AuthenticationError(
+            "Failed to send verification code. Please try again.")
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -67,46 +97,57 @@ async def register_user(payload: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/register-with-organization", status_code=status.HTTP_201_CREATED)
 async def register_with_organization(
-    payload: UserCreate,
-    organization: OrganizationOption,
+    payload: RegisterWithOrganizationRequest,
     db: Session = Depends(get_db)
 ):
     """
     Register a new user with organization options.
+    Requires email verification code to be sent first via /auth/send-verification-code.
 
     Options:
     - create: Create a new organization (user becomes super admin)
     - join: Join existing organization using 7-digit code
     - skip: Register without organization (can join later)
     """
-    # Create user
-    user = auth_service.create_user(db, payload)
+    # Complete registration with verification
+    user = auth_service.complete_registration_with_verification(
+        db=db,
+        email=payload.email,
+        code=payload.verificationCode,
+        full_name=payload.fullName,
+        password=payload.password,
+        display_name=payload.displayName
+    )
+
     org_service = OrganizationService()
     org_data = None
 
     try:
         # Handle organization action
-        if organization.action == "create":
+        if payload.action == "create":
             # Validate organization name provided
-            if not organization.name:
+            if not payload.organizationName:
                 raise ValueError(
                     "Organization name is required when action is 'create'")
 
             # Create organization with user as super admin
             from app.schemas.organization import OrganizationCreate
             org_create = OrganizationCreate(
-                name=organization.name, slug=organization.name.lower().replace(" ", "-"))
+                name=payload.organizationName,
+                slug=payload.organizationName.lower().replace(" ", "-")
+            )
             org = org_service.create_organization(db, org_create, user)
             org_data = OrganizationWithCode.model_validate(org)
 
-        elif organization.action == "join":
+        elif payload.action == "join":
             # Validate code provided
-            if not organization.code:
+            if not payload.organizationCode:
                 raise ValueError(
                     "Organization code is required when action is 'join'")
 
             # Join organization
-            org = org_service.join_organization(db, organization.code, user)
+            org = org_service.join_organization(
+                db, payload.organizationCode, user)
             if not org:
                 raise ValueError(
                     "Invalid organization code or organization not active")
@@ -143,9 +184,7 @@ async def register_with_organization(
         return responses.success_response(response_data, status_code=status.HTTP_201_CREATED)
 
     except ValueError as e:
-        # Rollback user creation if organization setup fails
-        db.delete(user)
-        db.commit()
+        logger.error(f"Organization setup failed: {e}")
         raise AuthenticationError(str(e))
     except Exception as e:
         logger.error(f"Registration failed: {e}")

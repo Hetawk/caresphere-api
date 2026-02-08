@@ -124,8 +124,14 @@ async def delete_user(
     current_user: User = Depends(deps.get_current_user)
 ):
     """
-    Delete a user.
+    Delete a user and handle all related records.
     Requires authentication.
+
+    This endpoint will:
+    - Delete user's sender profiles
+    - Nullify created_by references (templates, messages, members, etc.)
+    - Remove organization memberships
+    - Delete organization invitations sent by the user
     """
     target_user = db.get(User, user_id)
 
@@ -143,12 +149,81 @@ async def delete_user(
         )
 
     user_email = target_user.email
-    db.delete(target_user)
-    db.commit()
 
-    logger.info(f"User {current_user.email} deleted user {user_email}")
+    try:
+        # Import models to access related tables
+        from app.models.message import SenderProfile, Message, MessageRecipient
+        from app.models.member import Member, MemberNote, MemberGroup
+        from app.models.template import Template
+        from app.models.automation import Automation
+        from app.models.role import OrganizationUser, OrganizationInvitation
+        from app.models.setting import SenderSetting, SettingScope
 
-    return responses.success_response({"message": f"User {user_email} deleted successfully"})
+        # 1. Delete messages and their recipients (created by this user)
+        # Get message IDs first
+        message_ids = [msg.id for msg in db.query(
+            Message.id).filter(Message.created_by == user_id).all()]
+        if message_ids:
+            # Delete message recipients first (foreign key constraint)
+            db.query(MessageRecipient).filter(MessageRecipient.message_id.in_(
+                message_ids)).delete(synchronize_session=False)
+            # Then delete messages
+            db.query(Message).filter(Message.created_by ==
+                                     user_id).delete(synchronize_session=False)
+
+        # 2. Delete sender profiles owned by this user
+        db.query(SenderProfile).filter(
+            SenderProfile.user_id == user_id).delete()
+
+        # 3. Delete user-scoped sender settings
+        db.query(SenderSetting).filter(
+            SenderSetting.scope == SettingScope.USER,
+            SenderSetting.reference_id == user_id
+        ).delete()
+
+        # 4. Nullify created_by references (preserve data created by this user)
+        db.query(Template).filter(Template.created_by == user_id).update(
+            {"created_by": None}, synchronize_session=False)
+        db.query(Member).filter(Member.created_by == user_id).update(
+            {"created_by": None}, synchronize_session=False)
+        db.query(MemberNote).filter(MemberNote.created_by == user_id).update(
+            {"created_by": None}, synchronize_session=False)
+        db.query(MemberGroup).filter(MemberGroup.created_by == user_id).update(
+            {"created_by": None}, synchronize_session=False)
+        db.query(Automation).filter(Automation.created_by == user_id).update(
+            {"created_by": None}, synchronize_session=False)
+
+        # 5. Nullify member.user_id (unlink members from this user account)
+        db.query(Member).filter(Member.user_id == user_id).update(
+            {"user_id": None}, synchronize_session=False)
+
+        # 6. Delete organization memberships
+        db.query(OrganizationUser).filter(
+            OrganizationUser.user_id == user_id).delete()
+
+        # 7. Delete invitations sent by this user
+        db.query(OrganizationInvitation).filter(
+            OrganizationInvitation.invited_by == user_id).delete()
+
+        # 8. Finally, delete the user
+        db.delete(target_user)
+        db.commit()
+
+        logger.info(
+            f"User {current_user.email} deleted user {user_email} and cleaned up {len(message_ids) if message_ids else 0} messages and all related records")
+
+        return responses.success_response({
+            "message": f"User {user_email} deleted successfully",
+            "deleted_messages": len(message_ids) if message_ids else 0
+        })
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting user {user_email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete user: {str(e)}"
+        )
 
 
 @router.post("/promote-user", response_model=UserRoleResponse, status_code=status.HTTP_200_OK)

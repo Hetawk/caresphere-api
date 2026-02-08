@@ -197,3 +197,23 @@ class VerifyEmailRequest(BaseModel):
     """Schema for email verification."""
     email: EmailStr
     token: str = Field(min_length=6, max_length=6)
+
+
+class RegisterWithOrganizationRequest(BaseModel):
+    """Combined schema for user registration with organization options."""
+    email: EmailStr
+    password: str = Field(min_length=8)
+    fullName: str = Field(alias="full_name")
+    displayName: Optional[str] = Field(default=None, alias="display_name")
+    action: str = Field(pattern=r"^(create|join|skip)$")
+    organizationName: Optional[str] = Field(
+        default=None, alias="organization_name", min_length=2, max_length=255)
+    organizationCode: Optional[str] = Field(
+        default=None, alias="organization_code", min_length=7, max_length=7, pattern=r"^\d{7}$")
+    verificationCode: str = Field(
+        alias="verification_code", min_length=6, max_length=6)
+
+
+class SendVerificationCodeRequest(BaseModel):
+    """Schema for requesting a verification code."""
+    email: EmailStr
