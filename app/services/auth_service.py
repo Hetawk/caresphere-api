@@ -189,17 +189,15 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
     Returns the code to be sent via email.
     """
     from app.models.user import UserStatus
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"[AUTH_SERVICE] Generating verification code for: {email}")
 
     # Check if email is already registered with a real account
     existing_user = db.query(User).filter(User.email == email.lower()).first()
     if existing_user and existing_user.password_hash != "UNVERIFIED":
-        raise ConflictError("Email is already registered")
-
-    # Generate 6-digit code
-    code = generate_reset_token()  # Reuse the same function
-
-    # If temporary verification user exists, update it; otherwise create new
-    if existing_user:
+        logger.warning(f"[AUTH_SERVICE] Email already registered: {email}")
         existing_user.verification_token_hash = security.get_password_hash(
             code)
         existing_user.updated_at = datetime.utcnow()

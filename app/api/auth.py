@@ -18,6 +18,7 @@ from app.schemas.user import (
     RefreshResponse,
     RegisterWithOrganizationRequest,
     ResetPasswordRequest,
+    SendVerificationCodeRequest,
     UserCreate,
     UserLogin,
     UserPublic,
@@ -109,15 +110,26 @@ async def register_with_organization(
     - join: Join existing organization using 7-digit code
     - skip: Register without organization (can join later)
     """
-    # Complete registration with verification
-    user = auth_service.complete_registration_with_verification(
-        db=db,
-        email=payload.email,
-        code=payload.verificationCode,
-        full_name=payload.fullName,
-        password=payload.password,
-        display_name=payload.displayName
-    )
+    logger.info(f"[REGISTRATION] Starting registration for {payload.email}")
+    logger.info(
+        f"[REGISTRATION] Action: {payload.action}, Organization: {payload.organizationName or 'N/A'}")
+
+    try:
+        # Complete registration with verification
+        logger.info(f"[REGISTRATION] Verifying code for {payload.email}")
+        user = auth_service.complete_registration_with_verification(
+            db=db,
+            email=payload.email,
+            code=payload.verificationCode,
+            full_name=payload.fullName,
+            password=payload.password,
+            display_name=payload.displayName
+        )
+        logger.info(f"[REGISTRATION] ✅ User created: {user.id}")
+    except Exception as e:
+        logger.error(
+            f"[REGISTRATION] ❌ Verification failed for {payload.email}: {type(e).__name__}: {str(e)}")
+        raise
 
     org_service = OrganizationService()
     org_data = None
