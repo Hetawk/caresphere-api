@@ -215,9 +215,11 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
                 f"[AUTH_SERVICE] ❌ Email already registered with real account: {email}")
             # Check if user is active
             if existing_user.status == UserStatus.ACTIVE:
-                raise ConflictError("This email is already registered and active. Please login instead.")
+                raise ConflictError(
+                    "This email is already registered and active. Please login instead.")
             else:
-                raise ConflictError("This email is already registered but not active. Please contact support.")
+                raise ConflictError(
+                    "This email is already registered but not active. Please contact support.")
     else:
         # Create temporary "placeholder" user entry with the code
         logger.info(
