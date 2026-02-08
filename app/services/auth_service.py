@@ -198,15 +198,22 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
     code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
     logger.info(f"[AUTH_SERVICE] Generated code: {code}")
 
-    # Check if email is already registered with a real account
+    # Check if email is already registered
     existing_user = db.query(User).filter(User.email == email.lower()).first()
-    if existing_user and existing_user.password_hash != "UNVERIFIED":
-        logger.warning(f"[AUTH_SERVICE] Email already registered: {email}")
-        existing_user.verification_token_hash = security.get_password_hash(
-            code)
-        existing_user.updated_at = datetime.utcnow()
+    
+    if existing_user:
+        if existing_user.password_hash == "UNVERIFIED":
+            # Update existing temp user's verification code (resend case)
+            logger.info(f"[AUTH_SERVICE] Updating verification code for existing temp user: {email}")
+            existing_user.verification_token_hash = security.get_password_hash(code)
+            existing_user.updated_at = datetime.utcnow()
+        else:
+            # Real user already exists with this email
+            logger.warning(f"[AUTH_SERVICE] ❌ Email already registered with real account: {email}")
+            raise ConflictError("Email is already registered")
     else:
         # Create temporary "placeholder" user entry with the code
+        logger.info(f"[AUTH_SERVICE] Creating temp user for verification: {email}")
         temp_user = User(
             email=email.lower(),
             password_hash="UNVERIFIED",  # Placeholder
@@ -217,11 +224,7 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
         )
         db.add(temp_user)
 
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise ConflictError("Email is already registered")
+    db.commit()
 
     return code
 
