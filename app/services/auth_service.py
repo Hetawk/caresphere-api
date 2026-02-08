@@ -194,6 +194,10 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
 
     logger.info(f"[AUTH_SERVICE] Generating verification code for: {email}")
 
+    # Generate 6-digit code
+    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    logger.info(f"[AUTH_SERVICE] Generated code: {code}")
+
     # Check if email is already registered with a real account
     existing_user = db.query(User).filter(User.email == email.lower()).first()
     if existing_user and existing_user.password_hash != "UNVERIFIED":
