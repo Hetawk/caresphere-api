@@ -200,20 +200,28 @@ def generate_registration_verification_code(db: Session, email: str) -> str:
 
     # Check if email is already registered
     existing_user = db.query(User).filter(User.email == email.lower()).first()
-    
+
     if existing_user:
         if existing_user.password_hash == "UNVERIFIED":
             # Update existing temp user's verification code (resend case)
-            logger.info(f"[AUTH_SERVICE] Updating verification code for existing temp user: {email}")
-            existing_user.verification_token_hash = security.get_password_hash(code)
+            logger.info(
+                f"[AUTH_SERVICE] Updating verification code for existing temp user: {email}")
+            existing_user.verification_token_hash = security.get_password_hash(
+                code)
             existing_user.updated_at = datetime.utcnow()
         else:
             # Real user already exists with this email
-            logger.warning(f"[AUTH_SERVICE] ❌ Email already registered with real account: {email}")
-            raise ConflictError("Email is already registered")
+            logger.warning(
+                f"[AUTH_SERVICE] ❌ Email already registered with real account: {email}")
+            # Check if user is active
+            if existing_user.status == UserStatus.ACTIVE:
+                raise ConflictError("This email is already registered and active. Please login instead.")
+            else:
+                raise ConflictError("This email is already registered but not active. Please contact support.")
     else:
         # Create temporary "placeholder" user entry with the code
-        logger.info(f"[AUTH_SERVICE] Creating temp user for verification: {email}")
+        logger.info(
+            f"[AUTH_SERVICE] Creating temp user for verification: {email}")
         temp_user = User(
             email=email.lower(),
             password_hash="UNVERIFIED",  # Placeholder
